@@ -16,19 +16,51 @@ MODULES = [
     ('settings', 'Settings', 'Settings'),
 ]
 
+# module_key -> (can_view, can_create, can_edit, can_delete)
 ROLES = {
-    'Super Administrator': ['dashboard', 'patients', 'emr', 'pharmacy', 'nursing', 'lab', 'billing', 'inventory', 'hr', 'reports', 'settings'],
-    'Director': ['dashboard', 'patients', 'emr', 'billing', 'reports', 'hr'],
-    'Psychiatrist': ['dashboard', 'patients', 'emr', 'reports'],
-    'Nurse': ['dashboard', 'patients', 'nursing', 'emr'],
-    'Receptionist': ['dashboard', 'patients'],
-    'Pharmacist': ['dashboard', 'pharmacy', 'inventory'],
-    'Accountant': ['dashboard', 'billing', 'reports'],
+    'Super Administrator': {
+        key: (True, True, True, True)
+        for key in ['dashboard', 'patients', 'emr', 'pharmacy', 'nursing', 'lab', 'billing', 'inventory', 'hr', 'reports', 'settings']
+    },
+    'Director': {
+        'dashboard': (True, False, False, False),
+        'patients': (True, False, False, False),
+        'emr': (True, False, False, False),
+        'billing': (True, False, False, False),
+        'reports': (True, False, False, False),
+        'hr': (True, False, True, False),
+    },
+    'Psychiatrist': {
+        'dashboard': (True, False, False, False),
+        'patients': (True, False, True, False),
+        'emr': (True, True, True, False),
+        'reports': (True, False, False, False),
+    },
+    'Nurse': {
+        'dashboard': (True, False, False, False),
+        'patients': (True, False, True, False),
+        'nursing': (True, True, True, False),
+        'emr': (True, True, True, False),
+    },
+    'Receptionist': {
+        'dashboard': (True, False, False, False),
+        'patients': (True, True, True, False),  # can register/admit patients
+    },
+    'Pharmacist': {
+        'dashboard': (True, False, False, False),
+        'pharmacy': (True, True, True, False),
+        'inventory': (True, True, True, False),
+    },
+    'Accountant': {
+        'dashboard': (True, False, False, False),
+        'billing': (True, True, True, False),
+        'reports': (True, False, False, False),
+    },
 }
 
 
 class Command(BaseCommand):
-    help = "Seeds Modules and Roles to match the React RBAC config."
+    help = "Seeds Modules and Roles with granular permissions, matching the RBAC spec."
 
     def handle(self, *args, **kwargs):
         module_objs = {}
@@ -37,8 +69,17 @@ class Command(BaseCommand):
             module_objs[key] = mod
         self.stdout.write(self.style.SUCCESS(f"Seeded {len(module_objs)} modules."))
 
-        for role_name, module_keys in ROLES.items():
+        for role_name, module_perms in ROLES.items():
             role, _ = Role.objects.get_or_create(name=role_name, defaults={'is_system_role': True})
-            for key in module_keys:
-                RolePermission.objects.get_or_create(role=role, module=module_objs[key])
+            for key, (can_view, can_create, can_edit, can_delete) in module_perms.items():
+                RolePermission.objects.update_or_create(
+                    role=role,
+                    module=module_objs[key],
+                    defaults={
+                        'can_view': can_view,
+                        'can_create': can_create,
+                        'can_edit': can_edit,
+                        'can_delete': can_delete,
+                    },
+                )
             self.stdout.write(self.style.SUCCESS(f"Seeded role: {role_name}"))

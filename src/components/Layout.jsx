@@ -2,8 +2,9 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import Dashboard from '../pages/Dashboard';
 import Patients from '../pages/Patients';
-import Placeholder from '../pages/Placeholder';
+import Placeholder from '../pages/placeholder';
 import { MODULES } from '../config/roles';
+import EMR from '../pages/EMR';
 
 // Maps module key -> the component that renders it.
 // Modules without a real build yet fall back to Placeholder.

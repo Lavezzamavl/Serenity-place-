@@ -5,12 +5,15 @@ import Patients from '../pages/Patients';
 import Placeholder from '../pages/placeholder';
 import { MODULES } from '../config/roles';
 import EMR from '../pages/EMR';
+import Pharmacy from '../pages/Pharmacy';
 
 // Maps module key -> the component that renders it.
 // Modules without a real build yet fall back to Placeholder.
 const MODULE_COMPONENTS = {
   dashboard: Dashboard,
   patients: Patients,
+  emr: EMR,
+  pharmacy: Pharmacy,
 };
 
 export default function Layout({ user, activeModule, setActiveModule, onLogout }) {

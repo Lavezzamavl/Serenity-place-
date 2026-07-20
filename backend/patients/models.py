@@ -76,3 +76,15 @@ class Patient(models.Model):
 
     def __str__(self):
         return f"{self.admission_id} - {self.full_name}"
+    
+class ProgressNote(models.Model):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='progress_notes')
+    author = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
+    note = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']  # newest first, matches the UI
+
+    def __str__(self):
+        return f"Note on {self.patient.admission_id} by {self.author}"

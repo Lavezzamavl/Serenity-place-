@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Patient
+from .models import Patient, ProgressNote
 
 
 class PatientSerializer(serializers.ModelSerializer):
@@ -37,3 +37,16 @@ class PatientSerializer(serializers.ModelSerializer):
         if diastolic >= systolic:
             raise serializers.ValidationError("Diastolic pressure must be lower than systolic pressure.")
         return value
+class ProgressNoteSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProgressNote
+        fields = ['id', 'patient', 'note', 'author_name', 'created_at']
+        read_only_fields = ['author_name', 'created_at']
+
+    def get_author_name(self, obj):
+        if not obj.author:
+            return 'Unknown'
+        full = f"{obj.author.first_name} {obj.author.last_name}".strip()
+        return full or obj.author.username

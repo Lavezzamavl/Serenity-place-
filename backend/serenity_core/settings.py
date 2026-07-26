@@ -42,6 +42,13 @@ INSTALLED_APPS = [
     'corsheaders',
     'accounts',
     'patients',
+    'pharmacy',
+    'billing',
+    'nursing',
+    'inventory',
+    'hr',
+    'reports',
+    'facility_settings',
 ]
 
 MIDDLEWARE = [

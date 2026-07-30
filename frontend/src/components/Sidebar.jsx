@@ -1,9 +1,13 @@
 import * as Icons from 'lucide-react';
-import { MODULES, ROLES } from '../config/roles';
 
 export default function Sidebar({ user, activeModule, setActiveModule }) {
-  const allowedKeys = ROLES[user.role]?.modules || [];
-  const visibleModules = MODULES.filter((m) => allowedKeys.includes(m.key));
+  // user.role now comes from the real API (RoleSerializer), shaped like:
+  // { id, name, permissions: [{ module: { key, label, icon }, can_view, ... }] }
+  // instead of the old hardcoded ROLES[user.role] lookup.
+  const permissions = user.role?.permissions || [];
+  const visibleModules = permissions
+    .filter((p) => p.can_view)
+    .map((p) => p.module);
 
   return (
     <aside className="w-64 bg-harbor flex flex-col shrink-0">
@@ -35,13 +39,18 @@ export default function Sidebar({ user, activeModule, setActiveModule }) {
             </button>
           );
         })}
+        {visibleModules.length === 0 && (
+          <p className="text-white/40 text-xs px-3 py-4">
+            No modules assigned to this role yet.
+          </p>
+        )}
       </nav>
 
       {/* Role badge at the bottom - reinforces the RBAC story visually */}
       <div className="px-4 py-4 border-t border-white/10">
         <div className="bg-white/5 rounded-lg px-3 py-2.5">
           <p className="text-white/40 text-[10px] uppercase tracking-wide">Signed in as</p>
-          <p className="text-white text-sm font-medium truncate">{ROLES[user.role]?.label}</p>
+          <p className="text-white text-sm font-medium truncate">{user.role?.name || 'No role assigned'}</p>
           <p className="text-white/50 text-xs">{visibleModules.length} modules visible</p>
         </div>
       </div>

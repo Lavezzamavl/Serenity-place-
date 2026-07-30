@@ -13,17 +13,21 @@ const TONE_CLASSES = {
 };
 
 export default function Dashboard({ user }) {
+  // Same fallback pattern as Topbar - first_name may be blank if the user
+  // registered without filling it in, so fall back to username.
+  const firstName = user.first_name || user.username;
+
   return (
     <div className="space-y-6">
       <div>
         <h3 className="font-display text-xl font-semibold text-harbor">
-          Welcome back, {user.name.split(' ')[0]}
+          Welcome back, {firstName}
         </h3>
         <p className="text-sm text-slate mt-0.5">Here's what's happening at Serenity Place today.</p>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {STATS.map((stat) => {
           const Icon = Icons[stat.icon] || Icons.Circle;
           return (

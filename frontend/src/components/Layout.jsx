@@ -2,18 +2,30 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import Dashboard from '../pages/Dashboard';
 import Patients from '../pages/Patients';
-import Placeholder from '../pages/placeholder';
-import { MODULES } from '../config/roles';
 import EMR from '../pages/EMR';
 import Pharmacy from '../pages/Pharmacy';
+import Billing from '../pages/Billing';
+import Laboratory from '../pages/Laboratory';
+import Nursing from '../pages/Nursing';
+import Inventory from '../pages/Inventory';
+import HR from '../pages/HR';
+import Reports from '../pages/Reports';
+import SettingsPage from '../pages/SettingsPage';
+import Placeholder from '../pages/Placeholder';
+import { MODULES } from '../config/roles';
 
-// Maps module key -> the component that renders it.
-// Modules without a real build yet fall back to Placeholder.
 const MODULE_COMPONENTS = {
   dashboard: Dashboard,
   patients: Patients,
   emr: EMR,
   pharmacy: Pharmacy,
+  billing: Billing,
+  lab: Laboratory,
+  nursing: Nursing,
+  inventory: Inventory,
+  hr: HR,
+  reports: Reports,
+  settings: SettingsPage,
 };
 
 export default function Layout({ user, activeModule, setActiveModule, onLogout }) {
@@ -22,15 +34,9 @@ export default function Layout({ user, activeModule, setActiveModule, onLogout }
 
   return (
     <div className="flex h-screen bg-mist">
-      <Sidebar
-        user={user}
-        activeModule={activeModule}
-        setActiveModule={setActiveModule}
-      />
-
+      <Sidebar user={user} activeModule={activeModule} setActiveModule={setActiveModule} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar user={user} onLogout={onLogout} moduleLabel={activeModuleMeta?.label} />
-
         <main className="flex-1 overflow-y-auto p-6">
           <ActiveComponent user={user} />
         </main>

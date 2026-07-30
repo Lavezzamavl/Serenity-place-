@@ -1,5 +1,7 @@
-import { Receipt, TrendingUp, AlertCircle } from 'lucide-react';
-import { INVOICES, PAYMENT_METHODS_SUMMARY } from '../data/mockBilling';
+import { useState, useEffect } from 'react';
+import { Receipt, TrendingUp, AlertCircle, Plus, X, Loader2, CreditCard } from 'lucide-react';
+import { getInvoices, createInvoice, recordPayment } from '../api/billing';
+import { getPatients } from '../api/patients';
 
 const STATUS_STYLES = {
   Paid: 'bg-sage/15 text-sage',
@@ -7,9 +9,102 @@ const STATUS_STYLES = {
   Outstanding: 'bg-red-50 text-red-500',
 };
 
+const EMPTY_ITEM = { description: '', quantity: 1, unit_price: '' };
+
 export default function Billing() {
-  const totalRevenue = INVOICES.reduce((sum, i) => sum + i.paid, 0);
-  const totalOutstanding = INVOICES.reduce((sum, i) => sum + (i.amount - i.paid), 0);
+  const [invoices, setInvoices] = useState([]);
+  const [patients, setPatients] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [showInvoiceForm, setShowInvoiceForm] = useState(false);
+  const [invoiceForm, setInvoiceForm] = useState({ patient: '', items: [{ ...EMPTY_ITEM }] });
+  const [invoiceError, setInvoiceError] = useState('');
+  const [submittingInvoice, setSubmittingInvoice] = useState(false);
+
+  const [paymentTarget, setPaymentTarget] = useState(null); // invoice being paid
+  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'Cash' });
+  const [paymentError, setPaymentError] = useState('');
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  const loadInvoices = () => getInvoices().then(setInvoices);
+
+  useEffect(() => {
+    Promise.all([loadInvoices(), getPatients().then(setPatients)])
+      .finally(() => setLoading(false));
+  }, []);
+
+  const totalRevenue = invoices.reduce((sum, i) => sum + Number(i.total_paid), 0);
+  const totalOutstanding = invoices.reduce((sum, i) => sum + Number(i.balance), 0);
+
+  // --- Invoice creation ---
+  const updateItem = (index, field, value) => {
+    const items = [...invoiceForm.items];
+    items[index] = { ...items[index], [field]: value };
+    setInvoiceForm({ ...invoiceForm, items });
+  };
+  const addItemRow = () => setInvoiceForm({ ...invoiceForm, items: [...invoiceForm.items, { ...EMPTY_ITEM }] });
+  const removeItemRow = (index) => setInvoiceForm({
+    ...invoiceForm, items: invoiceForm.items.filter((_, i) => i !== index),
+  });
+
+  const handleCreateInvoice = async (e) => {
+    e.preventDefault();
+    setInvoiceError('');
+    if (!invoiceForm.patient) return setInvoiceError('Select a patient.');
+    const validItems = invoiceForm.items.filter((it) => it.description.trim() && Number(it.unit_price) > 0);
+    if (validItems.length === 0) return setInvoiceError('Add at least one billable item with a price.');
+
+    setSubmittingInvoice(true);
+    try {
+      await createInvoice(invoiceForm.patient, validItems.map((it) => ({
+        description: it.description, quantity: Number(it.quantity) || 1, unit_price: Number(it.unit_price),
+      })));
+      await loadInvoices();
+      setInvoiceForm({ patient: '', items: [{ ...EMPTY_ITEM }] });
+      setShowInvoiceForm(false);
+    } catch (err) {
+      setInvoiceError(err.response?.status === 403
+        ? "Your role doesn't have permission to create invoices."
+        : 'Could not create invoice. Please try again.');
+    } finally {
+      setSubmittingInvoice(false);
+    }
+  };
+
+  // --- Payment recording ---
+  const openPayment = (invoice) => {
+    setPaymentTarget(invoice);
+    setPaymentForm({ amount: '', method: 'Cash' });
+    setPaymentError('');
+  };
+
+  const handleRecordPayment = async (e) => {
+    e.preventDefault();
+    setPaymentError('');
+    const amount = Number(paymentForm.amount);
+    if (!amount || amount <= 0) return setPaymentError('Enter a valid amount.');
+    if (amount > paymentTarget.balance) return setPaymentError(`Exceeds outstanding balance of KES ${paymentTarget.balance}.`);
+
+    setSubmittingPayment(true);
+    try {
+      await recordPayment(paymentTarget.id, amount, paymentForm.method);
+      await loadInvoices();
+      setPaymentTarget(null);
+    } catch (err) {
+      const serverMsg = err.response?.data?.amount?.[0];
+      setPaymentError(serverMsg || 'Could not record payment. Please try again.');
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-slate">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading billing data...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -18,79 +113,202 @@ export default function Billing() {
           <div className="flex items-center gap-2 text-slate/60 text-xs uppercase tracking-wide mb-2">
             <TrendingUp className="w-3.5 h-3.5" /> Collected
           </div>
-          <p className="font-display text-2xl font-semibold text-harbor">
-            KES {totalRevenue.toLocaleString()}
-          </p>
+          <p className="font-display text-2xl font-semibold text-harbor">KES {totalRevenue.toLocaleString()}</p>
         </div>
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 text-slate/60 text-xs uppercase tracking-wide mb-2">
             <AlertCircle className="w-3.5 h-3.5" /> Outstanding
           </div>
-          <p className="font-display text-2xl font-semibold text-red-500">
-            KES {totalOutstanding.toLocaleString()}
-          </p>
+          <p className="font-display text-2xl font-semibold text-red-500">KES {totalOutstanding.toLocaleString()}</p>
         </div>
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2 text-slate/60 text-xs uppercase tracking-wide mb-2">
             <Receipt className="w-3.5 h-3.5" /> Invoices Issued
           </div>
-          <p className="font-display text-2xl font-semibold text-harbor">{INVOICES.length}</p>
+          <p className="font-display text-2xl font-semibold text-harbor">{invoices.length}</p>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowInvoiceForm(true)}
+          className="flex items-center gap-2 bg-serenity text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-harbor transition-colors"
+        >
+          <Plus className="w-4 h-4" /> New Invoice
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
         <div className="px-5 py-3 border-b border-gray-100">
-          <h4 className="font-medium text-harbor">Recent Invoices</h4>
+          <h4 className="font-medium text-harbor">Invoices</h4>
         </div>
-        <table className="w-full text-sm">
+        <table className="w-full text-sm min-w-[760px]">
           <thead className="bg-mist text-slate text-xs uppercase tracking-wide">
             <tr>
               <th className="text-left px-5 py-3 font-medium">Invoice</th>
               <th className="text-left px-5 py-3 font-medium">Patient</th>
-              <th className="text-left px-5 py-3 font-medium">Items</th>
-              <th className="text-left px-5 py-3 font-medium">Amount</th>
+              <th className="text-left px-5 py-3 font-medium">Total</th>
               <th className="text-left px-5 py-3 font-medium">Paid</th>
+              <th className="text-left px-5 py-3 font-medium">Balance</th>
               <th className="text-left px-5 py-3 font-medium">Status</th>
+              <th className="px-5 py-3"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {INVOICES.map((inv) => (
+            {invoices.map((inv) => (
               <tr key={inv.id} className="hover:bg-mist/50 transition-colors">
-                <td className="px-5 py-3 font-mono text-xs text-harbor">{inv.id}</td>
-                <td className="px-5 py-3 font-medium text-harbor">{inv.patient}</td>
-                <td className="px-5 py-3 text-slate">{inv.items}</td>
-                <td className="px-5 py-3 font-mono text-harbor">KES {inv.amount.toLocaleString()}</td>
-                <td className="px-5 py-3 font-mono text-slate">KES {inv.paid.toLocaleString()}</td>
+                <td className="px-5 py-3 font-mono text-xs text-harbor">{inv.invoice_number}</td>
+                <td className="px-5 py-3 font-medium text-harbor">{inv.patient_name}</td>
+                <td className="px-5 py-3 font-mono text-harbor">KES {Number(inv.total_amount).toLocaleString()}</td>
+                <td className="px-5 py-3 font-mono text-slate">KES {Number(inv.total_paid).toLocaleString()}</td>
+                <td className="px-5 py-3 font-mono text-slate">KES {Number(inv.balance).toLocaleString()}</td>
                 <td className="px-5 py-3">
                   <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[inv.status]}`}>
                     {inv.status}
                   </span>
                 </td>
+                <td className="px-5 py-3">
+                  {inv.status !== 'Paid' && (
+                    <button
+                      onClick={() => openPayment(inv)}
+                      className="flex items-center gap-1 text-serenity text-xs font-medium hover:text-harbor"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" /> Record Payment
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
+            {invoices.length === 0 && (
+              <tr><td colSpan={7} className="text-center py-10 text-slate/60">No invoices yet.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
 
-      <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
-        <h4 className="font-medium text-harbor mb-4">Payments by Method (This Month)</h4>
-        <div className="space-y-3">
-          {PAYMENT_METHODS_SUMMARY.map((p) => {
-            const max = Math.max(...PAYMENT_METHODS_SUMMARY.map((x) => x.amount));
-            return (
-              <div key={p.method}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-slate">{p.method}</span>
-                  <span className="font-mono text-harbor">KES {p.amount.toLocaleString()}</span>
-                </div>
-                <div className="h-2 bg-mist rounded-full overflow-hidden">
-                  <div className="h-full bg-serenity rounded-full" style={{ width: `${(p.amount / max) * 100}%` }} />
-                </div>
+      {/* New Invoice modal */}
+      {showInvoiceForm && (
+        <div className="fixed inset-0 bg-harbor/40 flex items-center justify-center z-50 px-4 py-8 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 my-auto">
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-display text-lg font-semibold text-harbor">New Invoice</h3>
+              <button onClick={() => setShowInvoiceForm(false)} className="text-slate hover:text-harbor">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateInvoice} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate mb-1">Patient</label>
+                <select
+                  value={invoiceForm.patient}
+                  onChange={(e) => setInvoiceForm({ ...invoiceForm, patient: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity bg-white"
+                >
+                  <option value="">Select patient...</option>
+                  {patients.map((p) => (
+                    <option key={p.id} value={p.id}>{p.full_name} ({p.admission_id})</option>
+                  ))}
+                </select>
               </div>
-            );
-          })}
+
+              <p className="text-xs font-medium text-slate uppercase tracking-wide pt-2">Billable Items</p>
+              {invoiceForm.items.map((item, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <input
+                    placeholder="Description e.g. Rehab Package (Weekly)"
+                    value={item.description}
+                    onChange={(e) => updateItem(i, 'description', e.target.value)}
+                    className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                  />
+                  <input
+                    type="number" min="1" placeholder="Qty"
+                    value={item.quantity}
+                    onChange={(e) => updateItem(i, 'quantity', e.target.value)}
+                    className="w-16 px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                  />
+                  <input
+                    type="number" min="0" placeholder="Price"
+                    value={item.unit_price}
+                    onChange={(e) => updateItem(i, 'unit_price', e.target.value)}
+                    className="w-24 px-2 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                  />
+                  {invoiceForm.items.length > 1 && (
+                    <button type="button" onClick={() => removeItemRow(i)} className="text-slate hover:text-red-500 p-2">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button type="button" onClick={addItemRow} className="text-xs text-serenity font-medium hover:text-harbor">
+                + Add another item
+              </button>
+
+              {invoiceError && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{invoiceError}</p>}
+
+              <button
+                type="submit"
+                disabled={submittingInvoice}
+                className="w-full flex items-center justify-center gap-2 bg-serenity text-white font-medium py-2.5 rounded-lg hover:bg-harbor transition-colors disabled:opacity-60 mt-2"
+              >
+                {submittingInvoice && <Loader2 className="w-4 h-4 animate-spin" />}
+                {submittingInvoice ? 'Creating...' : 'Create Invoice'}
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Record Payment modal */}
+      {paymentTarget && (
+        <div className="fixed inset-0 bg-harbor/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="font-display text-lg font-semibold text-harbor">Record Payment</h3>
+                <p className="text-xs text-slate mt-0.5">{paymentTarget.invoice_number} — Balance: KES {Number(paymentTarget.balance).toLocaleString()}</p>
+              </div>
+              <button onClick={() => setPaymentTarget(null)} className="text-slate hover:text-harbor">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleRecordPayment} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate mb-1">Amount (KES)</label>
+                <input
+                  type="number" min="1" max={paymentTarget.balance}
+                  value={paymentForm.amount}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate mb-1">Payment Method</label>
+                <select
+                  value={paymentForm.method}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity bg-white"
+                >
+                  <option>Cash</option>
+                  <option>M-Pesa</option>
+                  <option>Bank Transfer</option>
+                  <option>Card</option>
+                </select>
+              </div>
+
+              {paymentError && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{paymentError}</p>}
+
+              <button
+                type="submit"
+                disabled={submittingPayment}
+                className="w-full flex items-center justify-center gap-2 bg-serenity text-white font-medium py-2.5 rounded-lg hover:bg-harbor transition-colors disabled:opacity-60 mt-2"
+              >
+                {submittingPayment && <Loader2 className="w-4 h-4 animate-spin" />}
+                {submittingPayment ? 'Recording...' : 'Confirm Payment'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

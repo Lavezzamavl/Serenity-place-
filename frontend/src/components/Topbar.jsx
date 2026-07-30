@@ -1,8 +1,15 @@
 import { LogOut, Bell } from 'lucide-react';
 
 export default function Topbar({ user, onLogout, moduleLabel }) {
-  const initials = user.name
+  // Real API gives us first_name/last_name/username instead of a single
+  // 'name' field, so we build a display name here with sensible fallbacks.
+  const displayName = (user.first_name || user.last_name)
+    ? `${user.first_name} ${user.last_name}`.trim()
+    : user.username;
+
+  const initials = displayName
     .split(' ')
+    .filter(Boolean)
     .map((w) => w[0])
     .slice(0, 2)
     .join('')
@@ -25,7 +32,7 @@ export default function Topbar({ user, onLogout, moduleLabel }) {
             {initials}
           </div>
           <div className="leading-tight">
-            <p className="text-sm font-medium text-harbor">{user.name}</p>
+            <p className="text-sm font-medium text-harbor">{displayName}</p>
           </div>
           <button
             onClick={onLogout}

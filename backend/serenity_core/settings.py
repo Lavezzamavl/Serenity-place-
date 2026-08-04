@@ -136,7 +136,8 @@ STATIC_URL = 'static/'
 AUTH_USER_MODEL = 'accounts.User'
 
 CORS_ALLOWED_ORIGINS = [
-    "https://serenity-place-qgdhtba0x-nate-aec9.vercel.app/",  # your Vite dev server
+    "http://localhost:5173",
+    "https://serenity-place-qgdhtba0x-nate-aec9.vercel.app",  # your Vite dev server
 ]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://serenity-place-.*\.vercel\.app$",

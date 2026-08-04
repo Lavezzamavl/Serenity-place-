@@ -138,7 +138,9 @@ AUTH_USER_MODEL = 'accounts.User'
 CORS_ALLOWED_ORIGINS = [
     "https://serenity-place-qgdhtba0x-nate-aec9.vercel.app/",  # your Vite dev server
 ]
-
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://serenity-place-.*\.vercel\.app$",
+]
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',

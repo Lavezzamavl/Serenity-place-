@@ -136,7 +136,7 @@ STATIC_URL = 'static/'
 AUTH_USER_MODEL = 'accounts.User'
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # your Vite dev server
+    "https://serenity-place-qgdhtba0x-nate-aec9.vercel.app/",  # your Vite dev server
 ]
 
 REST_FRAMEWORK = {

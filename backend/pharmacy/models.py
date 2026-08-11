@@ -7,6 +7,20 @@ class Drug(models.Model):
         ('Tablet', 'Tablet'), ('Capsule', 'Capsule'),
         ('Injection', 'Injection'), ('Syrup', 'Syrup'),
     ]
+    
+    buying_price = models.DecimalField(
+    max_digits=10,
+    decimal_places=2,
+    default=0.00,
+    validators=[MinValueValidator(0)]
+    )
+
+selling_price = models.DecimalField(
+    max_digits=10,
+    decimal_places=2,
+    default=0.00,
+    validators=[MinValueValidator(0)]
+    )
 
     name = models.CharField(max_length=150)
     generic_name = models.CharField(max_length=150, blank=True)
@@ -29,7 +43,30 @@ class Drug(models.Model):
             return 'Expiring Soon'
         return 'OK'
 
+class StockAddition(models.Model):
+    drug = models.ForeignKey(
+        Drug,
+        on_delete=models.CASCADE,
+        related_name='stock_additions'
+    )
 
+    quantity = models.PositiveIntegerField(
+        validators=[MinValueValidator(1)]
+    )
+
+    added_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True
+    )
+
+    added_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-added_at']
+
+    def __str__(self):
+        return f"+{self.quantity} {self.drug.name}"
 class DispenseRecord(models.Model):
     """
     Every time medication is dispensed to a patient. This is what actually

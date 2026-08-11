@@ -2,16 +2,18 @@ from rest_framework import viewsets
 from .models import NursingNote, VitalsCheck
 from .serializers import NursingNoteSerializer, VitalsCheckSerializer
 from patients.permissions import HasModulePermission
+from audit_trail.mixins import AuditedViewSetMixin
 
 
-class NursingNoteViewSet(viewsets.ModelViewSet):
+class NursingNoteViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = NursingNote.objects.all()
     serializer_class = NursingNoteSerializer
     permission_classes = [HasModulePermission]
     module_key = 'nursing'
 
-    def perform_create(self, serializer):
-        serializer.save(nurse=self.request.user)
+    def extra_create_kwargs(self):
+        return {'nurse': self.request.user}
+
     def get_queryset(self):
         queryset = NursingNote.objects.all()
         patient_id = self.request.query_params.get('patient')
@@ -20,15 +22,15 @@ class NursingNoteViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-class VitalsCheckViewSet(viewsets.ModelViewSet):
+class VitalsCheckViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = VitalsCheck.objects.all()
     serializer_class = VitalsCheckSerializer
     permission_classes = [HasModulePermission]
     module_key = 'nursing'
 
-    def perform_create(self, serializer):
-        serializer.save(recorded_by=self.request.user)
-    
+    def extra_create_kwargs(self):
+        return {'recorded_by': self.request.user}
+
     def get_queryset(self):
         queryset = VitalsCheck.objects.all()
         patient_id = self.request.query_params.get('patient')

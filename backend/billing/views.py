@@ -2,9 +2,10 @@ from rest_framework import viewsets
 from .models import Invoice, Payment
 from .serializers import InvoiceSerializer, InvoiceCreateSerializer, PaymentSerializer
 from patients.permissions import HasModulePermission
+from audit_trail.mixins import AuditedViewSetMixin
 
 
-class InvoiceViewSet(viewsets.ModelViewSet):
+class InvoiceViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = Invoice.objects.all().order_by('-created_at')
     permission_classes = [HasModulePermission]
     module_key = 'billing'
@@ -15,11 +16,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return InvoiceSerializer
 
 
-class PaymentViewSet(viewsets.ModelViewSet):
+class PaymentViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
     permission_classes = [HasModulePermission]
     module_key = 'billing'
 
-    def perform_create(self, serializer):
-        serializer.save(received_by=self.request.user)
+    def extra_create_kwargs(self):
+        return {'received_by': self.request.user}

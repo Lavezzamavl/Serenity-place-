@@ -1,21 +1,36 @@
 from rest_framework import viewsets
-from .models import Drug, DispenseRecord
-from .serializers import DrugSerializer, DispenseRecordSerializer
-from patients.permissions import HasModulePermission
+from .models import Drug, DispenseRecord, StockAddition
+from .serializers import DrugSerializer, DispenseRecordSerializer, StockAdditionSerializer
+from patients.permissions import HasModulePermission, IsAdminRole
+from audit_trail.mixins import AuditedViewSetMixin
 
 
-class DrugViewSet(viewsets.ModelViewSet):
+class DrugViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = Drug.objects.all().order_by('name')
     serializer_class = DrugSerializer
     permission_classes = [HasModulePermission]
     module_key = 'pharmacy'
 
 
-class DispenseRecordViewSet(viewsets.ModelViewSet):
+class DispenseRecordViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = DispenseRecord.objects.all()
     serializer_class = DispenseRecordSerializer
     permission_classes = [HasModulePermission]
     module_key = 'pharmacy'
 
-    def perform_create(self, serializer):
-        serializer.save(dispensed_by=self.request.user)
+    def extra_create_kwargs(self):
+        return {'dispensed_by': self.request.user}
+
+
+class StockAdditionViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
+    queryset = StockAddition.objects.all()
+    serializer_class = StockAdditionSerializer
+    module_key = 'pharmacy'
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [HasModulePermission(), IsAdminRole()]
+        return [HasModulePermission()]
+
+    def extra_create_kwargs(self):
+        return {'added_by': self.request.user}

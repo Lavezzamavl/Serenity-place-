@@ -10,12 +10,6 @@ ACTION_TO_FLAG = {
 
 
 class HasModulePermission(BasePermission):
-    """
-    Checks whether the logged-in user's Role has the right RolePermission
-    flag for this view's module_key, matching the HTTP method used.
-    e.g. a Receptionist with can_create=True on 'patients' can POST,
-    but a Nurse with can_create=False on 'patients' gets a 403.
-    """
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
@@ -30,3 +24,15 @@ class HasModulePermission(BasePermission):
             return False
 
         return role.permissions.filter(module__key=module_key, **{required_flag: True}).exists()
+    
+
+class IsAdminRole(BasePermission):
+    """Admin-gate for actions that must bypass per-module CRUD flags entirely —
+    e.g. stock adjustments. Superuser always passes; otherwise role.is_admin_role."""
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        return bool(user.role and user.role.is_admin_role)

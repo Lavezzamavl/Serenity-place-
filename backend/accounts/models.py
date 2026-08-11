@@ -13,7 +13,7 @@ class Role(models.Model):
         default=False,
         help_text="True for built-in roles (Super Admin, Nurse, etc) that shouldn't be deleted."
     )
-    is_admin = models.BooleanField(
+    is_admin_role= models.BooleanField(
         default=False,
         help_text="Grants access to admin-only actions(e.g. stock adjustments, user approvals, role management)."
                     "regradless of the module permissions flags."

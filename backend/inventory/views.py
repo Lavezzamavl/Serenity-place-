@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from .models import InventoryItem, StockAdjustment
 from .serializers import InventoryItemSerializer, StockAdjustmentSerializer
 from patients.permissions import HasModulePermission, IsAdminRole
+from audit_trail.mixins import AuditedViewSetMixin
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
@@ -20,7 +21,7 @@ class StockAdjustmentViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(adjusted_by=self.request.user)
         
-class StockAdjustmentViewSet(viewsets.ModelViewSet):
+class StockAdjustmentViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = StockAdjustment.objects.all()
     serializer_class = StockAdjustmentSerializer
     module_key = 'inventory'
@@ -30,5 +31,5 @@ class StockAdjustmentViewSet(viewsets.ModelViewSet):
             return [HasModulePermission(), IsAdminRole()]
         return [HasModulePermission()]
 
-    def perform_create(self, serializer):
-        serializer.save(adjusted_by=self.request.user)
+    def extra_create_kwargs(self):
+        return {'adjusted_by': self.request.user}

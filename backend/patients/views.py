@@ -2,22 +2,23 @@ from rest_framework import viewsets
 from .models import Patient, ProgressNote
 from .serializers import PatientSerializer, ProgressNoteSerializer
 from .permissions import HasModulePermission
+from audit_trail.mixins import AuditedViewSetMixin
 
 
-class PatientViewSet(viewsets.ModelViewSet):
+class PatientViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = Patient.objects.all().order_by('-id')
     serializer_class = PatientSerializer
     permission_classes = [HasModulePermission]
     module_key = 'patients'
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+    def extra_create_kwargs(self):
+        return {'created_by': self.request.user}
 
 
-class ProgressNoteViewSet(viewsets.ModelViewSet):
+class ProgressNoteViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     serializer_class = ProgressNoteSerializer
     permission_classes = [HasModulePermission]
-    module_key = 'emr'  # gated by EMR permissions, not Patients - matches the sidebar module it lives under
+    module_key = 'emr'
 
     def get_queryset(self):
         queryset = ProgressNote.objects.all()
@@ -26,5 +27,5 @@ class ProgressNoteViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(patient__admission_id=patient_id)
         return queryset
 
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
+    def extra_create_kwargs(self):
+        return {'author': self.request.user}

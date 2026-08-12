@@ -3,10 +3,12 @@ from .models import Invoice, Payment
 from .serializers import InvoiceSerializer, InvoiceCreateSerializer, PaymentSerializer
 from patients.permissions import HasModulePermission
 from audit_trail.mixins import AuditedViewSetMixin
+from audit_trail.utils import log_action
 
-
-class InvoiceViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
-    queryset = Invoice.objects.all().order_by('-created_at')
+class InvoiceViewSet(viewsets.ModelViewSet):
+    queryset = Invoice.objects.select_related('patient', 'created_by').prefetch_related(
+        'items', 'payments'
+    ).order_by('-created_at')
     permission_classes = [HasModulePermission]
     module_key = 'billing'
 
@@ -16,11 +18,13 @@ class InvoiceViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
         return InvoiceSerializer
 
 
-class PaymentViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
-    queryset = Payment.objects.all()
+class PaymentViewSet(viewsets.ModelViewSet):
+    queryset = Payment.objects.select_related('invoice', 'received_by')
     serializer_class = PaymentSerializer
     permission_classes = [HasModulePermission]
     module_key = 'billing'
-
-    def extra_create_kwargs(self):
-        return {'received_by': self.request.user}
+    
+    def perform_create(self, serializer):
+        payment = serializer.save(received_by=self.request.user)
+        log_action(self.request, 'payment_received', module='billing',
+                   detail=f"Payment of {payment.amount} for Invoice {payment.invoice.id}")

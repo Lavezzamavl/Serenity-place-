@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
+from audit_trail.utils import log_action
 from .models import User
 from .serializers import RegisterSerializer, UserSerializer
 
@@ -58,18 +58,25 @@ class LoginView(TokenObtainPairView):
     """
     serializer_class = ApprovalCheckingTokenSerializer
     permission_classes = [permissions.AllowAny]
+    
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            log_action(request, 'login', module='auth', detail=request.data.get('username', ''))
+        return response
 
 
 class MeView(APIView):
-    """
-    GET /api/auth/me/
-    Returns the CURRENTLY logged-in user's own profile only.
-    This is what enforces "users must never view other users' roles" -
-    there is no user ID in this URL, it always uses request.user,
-    so there's no way to ask for anyone else's data through this endpoint.
-    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        serializer = UserSerializer(request.user)
+        # select_related follows the FK to Role in one JOIN instead of a
+        # second query; prefetch_related does the same for the reverse FK
+        # from Role to its RolePermission rows - without these two lines,
+        # loading one user's profile triggers 1 (user) + 1 (role) +
+        # N (one per permission row) queries instead of just 2 total.
+        user = User.objects.select_related('role').prefetch_related(
+            'role__permissions__module'
+        ).get(pk=request.user.pk)
+        serializer = UserSerializer(user)
         return Response(serializer.data)

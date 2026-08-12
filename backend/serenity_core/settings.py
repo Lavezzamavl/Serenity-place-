@@ -25,6 +25,16 @@ SECRET_KEY = 'django-insecure-gy-@5lk))oyfy4&x6bsa&vb*(pxt-uucd5txv%l(9i+r*ck16t
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+# Security hardening - only active when DEBUG=False (i.e. in production)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    
+
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
@@ -150,8 +160,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 25,
 }
-
 from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),

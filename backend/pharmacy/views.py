@@ -3,7 +3,7 @@ from .models import Drug, DispenseRecord, StockAddition
 from .serializers import DrugSerializer, DispenseRecordSerializer, StockAdditionSerializer
 from patients.permissions import HasModulePermission, IsAdminRole
 from audit_trail.mixins import AuditedViewSetMixin
-
+from audit_trail.utils import log_action
 
 class DrugViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     queryset = Drug.objects.all().order_by('name')
@@ -12,14 +12,16 @@ class DrugViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
     module_key = 'pharmacy'
 
 
-class DispenseRecordViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):
+class DispenseRecordViewSet(viewsets.ModelViewSet):
     queryset = DispenseRecord.objects.all()
     serializer_class = DispenseRecordSerializer
     permission_classes = [HasModulePermission]
     module_key = 'pharmacy'
 
-    def extra_create_kwargs(self):
-        return {'dispensed_by': self.request.user}
+    def perform_create(self, serializer):
+        record = serializer.save(dispensed_by=self.request.user)
+        log_action(self.request, 'medication_dispensed', module='pharmacy',
+                   detail=f"{record.quantity}x {record.drug.name} -> {record.patient.admission_id}")
 
 
 class StockAdditionViewSet(AuditedViewSetMixin, viewsets.ModelViewSet):

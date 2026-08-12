@@ -8,6 +8,8 @@ class AuditLog(models.Model):
         CREATE = 'CREATE', 'Created'
         UPDATE = 'UPDATE', 'Updated'
         DELETE = 'DELETE', 'Deleted'
+        LOGIN = 'LOGIN', 'Logged in'
+        LOGOUT = 'LOGOUT', 'Logged out'
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='audit_logs'

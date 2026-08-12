@@ -6,7 +6,8 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from audit_trail.utils import log_action
 from .models import User
 from .serializers import RegisterSerializer, UserSerializer
-
+from audit_trail.models import AuditLog
+from audit_trail.utils import log_action
 
 class RegisterView(generics.CreateAPIView):
     """
@@ -62,7 +63,7 @@ class LoginView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         if response.status_code == 200:
-            log_action(request, 'login', module='auth', detail=request.data.get('username', ''))
+           log_action(request, AuditLog.Action.LOGIN, module='auth', detail=request.data.get('username', ''))
         return response
 
 

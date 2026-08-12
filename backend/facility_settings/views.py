@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from .models import FacilitySettings
 from .serializers import FacilitySettingsSerializer
 from patients.permissions import HasModulePermission
-from audit_trail import log_action
+from audit_trail.utils import log_action
 
 
 class FacilitySettingsView(APIView):

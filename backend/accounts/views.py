@@ -61,10 +61,14 @@ class LoginView(TokenObtainPairView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        if response.status_code == 200:
-           log_action(request, AuditLog.Action.LOGIN, module='auth', detail=request.data.get('username', ''))
-        return response
+        try:
+            response = super().post(request, *args, **kwargs)
+            log_action(request, 'login', module='auth', detail=request.data.get('username', ''))
+            return response
+        except Exception:
+            log_action(request, 'failed_login', module='auth', detail=request.data.get('username', ''))
+            raise
+        
 
 
 class MeView(APIView):

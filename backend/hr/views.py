@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from .models import StaffProfile, LeaveRequest
 from .serializers import StaffProfileSerializer, LeaveRequestSerializer
 from patients.permissions import HasModulePermission
-
+from audit_trail.utils import log_action
 
 class StaffProfileViewSet(viewsets.ModelViewSet):
     queryset = StaffProfile.objects.select_related('user').all()
@@ -29,4 +29,6 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         leave.status = decision
         leave.reviewed_by = request.user
         leave.save()
+        log_action(request, f'leave_{decision.lower()}', module='hr',
+                   detail=f"{leave.staff.user.username}: {leave.start_date} to {leave.end_date}")
         return Response(self.get_serializer(leave).data)

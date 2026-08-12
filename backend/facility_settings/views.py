@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from .models import FacilitySettings
 from .serializers import FacilitySettingsSerializer
 from patients.permissions import HasModulePermission
+from audit_trail import log_action
 
 
 class FacilitySettingsView(APIView):
@@ -19,4 +20,6 @@ class FacilitySettingsView(APIView):
         serializer = FacilitySettingsSerializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
+        log_action(request, 'settings_changed', module='settings',
+                   detail='Facility settings updated')
         return Response(serializer.data)

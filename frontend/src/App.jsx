@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Login from './pages/Login';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 import { fetchMe, logout as apiLogout } from './api/auth';
 
 export default function App() {
@@ -8,8 +9,6 @@ export default function App() {
   const [activeModule, setActiveModule] = useState('dashboard');
   const [checkingSession, setCheckingSession] = useState(true);
 
-  // On page load/refresh, if we still have a valid token, stay logged in
-  // instead of bouncing back to the login screen.
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (!token) {
@@ -36,16 +35,18 @@ export default function App() {
     return <div className="min-h-screen flex items-center justify-center bg-mist text-slate">Loading...</div>;
   }
 
-  if (!user) {
-    return <Login onLogin={handleLogin} />;
-  }
-
   return (
-    <Layout
-      user={user}
-      activeModule={activeModule}
-      setActiveModule={setActiveModule}
-      onLogout={handleLogout}
-    />
+    <ErrorBoundary>
+      {!user ? (
+        <Login onLogin={handleLogin} />
+      ) : (
+        <Layout
+          user={user}
+          activeModule={activeModule}
+          setActiveModule={setActiveModule}
+          onLogout={handleLogout}
+        />
+      )}
+    </ErrorBoundary>
   );
 }

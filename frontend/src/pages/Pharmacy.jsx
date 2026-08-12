@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Pill, AlertTriangle, Search, Send, X, Loader2 } from 'lucide-react';
-import { getDrugs, dispenseMedication } from '../api/pharmacy';
+import { Pill, AlertTriangle, Search, Send, Plus, X, Loader2 } from 'lucide-react';
+import { getDrugs, dispenseMedication, addStock } from '../api/pharmacy';
 import { getPatients } from '../api/patients';
 
 const STATUS_STYLES = {
@@ -9,16 +9,26 @@ const STATUS_STYLES = {
   'Expiring Soon': 'bg-amber-50 text-amber-600',
 };
 
-export default function Pharmacy() {
+export default function Pharmacy({ user }) {
   const [drugs, setDrugs] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
 
-  const [dispenseTarget, setDispenseTarget] = useState(null); // the drug being dispensed
+  const [dispenseTarget, setDispenseTarget] = useState(null);
   const [form, setForm] = useState({ patient: '', quantity: '', notes: '' });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // NEW: add-stock modal state
+  const [stockTarget, setStockTarget] = useState(null); // the drug being restocked
+  const [stockForm, setStockForm] = useState({
+    quantity: '', batch_number: '', supplier: '', buying_price: '', selling_price: '', notes: '',
+  });
+  const [stockError, setStockError] = useState('');
+  const [stockSubmitting, setStockSubmitting] = useState(false);
+
+  const isAdmin = user?.is_superuser || user?.role?.is_admin_role;
 
   const loadDrugs = () => getDrugs().then(setDrugs);
 
@@ -34,6 +44,15 @@ export default function Pharmacy() {
     setDispenseTarget(drug);
     setForm({ patient: patients[0]?.id || '', quantity: '', notes: '' });
     setError('');
+  };
+
+  const openAddStock = (drug) => {
+    setStockTarget(drug);
+    setStockForm({
+      quantity: '', batch_number: drug.batch_number || '', supplier: drug.supplier || '',
+      buying_price: drug.buying_price || '', selling_price: drug.selling_price || '', notes: '',
+    });
+    setStockError('');
   };
 
   const handleDispense = async (e) => {
@@ -55,7 +74,7 @@ export default function Pharmacy() {
         quantity: qty,
         notes: form.notes,
       });
-      await loadDrugs(); // refresh stock numbers from the server - source of truth
+      await loadDrugs();
       setDispenseTarget(null);
     } catch (err) {
       const serverMsg = err.response?.data?.quantity?.[0] || err.response?.data?.detail;
@@ -66,6 +85,42 @@ export default function Pharmacy() {
       ));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // NEW: submit handler for adding stock
+  const handleAddStock = async (e) => {
+    e.preventDefault();
+    setStockError('');
+
+    const qty = Number(stockForm.quantity);
+    const buy = Number(stockForm.buying_price);
+    const sell = Number(stockForm.selling_price);
+    if (!qty || qty < 1) return setStockError('Enter a valid quantity.');
+    if (buy < 0 || sell < 0) return setStockError('Prices cannot be negative.');
+
+    setStockSubmitting(true);
+    try {
+      await addStock({
+        drug: stockTarget.id,
+        quantity: qty,
+        batch_number: stockForm.batch_number,
+        supplier: stockForm.supplier,
+        buying_price: buy,
+        selling_price: sell,
+        notes: stockForm.notes,
+      });
+      await loadDrugs();
+      setStockTarget(null);
+    } catch (err) {
+      const serverMsg = err.response?.data?.quantity?.[0] || err.response?.data?.detail;
+      setStockError(serverMsg || (
+        err.response?.status === 403
+          ? 'Only administrators can add stock or change pricing.'
+          : 'Could not add stock. Please try again.'
+      ));
+    } finally {
+      setStockSubmitting(false);
     }
   };
 
@@ -99,12 +154,13 @@ export default function Pharmacy() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
+        <table className="w-full text-sm min-w-[900px]">
           <thead className="bg-mist text-slate text-xs uppercase tracking-wide">
             <tr>
               <th className="text-left px-5 py-3 font-medium">Drug</th>
               <th className="text-left px-5 py-3 font-medium">Strength / Form</th>
               <th className="text-left px-5 py-3 font-medium">Stock</th>
+              <th className="text-left px-5 py-3 font-medium">Buy / Sell</th>
               <th className="text-left px-5 py-3 font-medium">Expiry</th>
               <th className="text-left px-5 py-3 font-medium">Status</th>
               <th className="px-5 py-3"></th>
@@ -124,6 +180,9 @@ export default function Pharmacy() {
                 </td>
                 <td className="px-5 py-3 text-slate">{d.strength} · {d.form}</td>
                 <td className="px-5 py-3 font-mono text-harbor">{d.stock_quantity}</td>
+                <td className="px-5 py-3 text-slate font-mono text-xs">
+                  {d.buying_price} / {d.selling_price}
+                </td>
                 <td className="px-5 py-3 text-slate">{d.expiry_date}</td>
                 <td className="px-5 py-3">
                   <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[d.status]}`}>
@@ -131,13 +190,23 @@ export default function Pharmacy() {
                   </span>
                 </td>
                 <td className="px-5 py-3">
-                  <button
-                    onClick={() => openDispense(d)}
-                    disabled={d.stock_quantity === 0}
-                    className="flex items-center gap-1 text-serenity text-xs font-medium hover:text-harbor disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Send className="w-3.5 h-3.5" /> Dispense
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => openDispense(d)}
+                      disabled={d.stock_quantity === 0}
+                      className="flex items-center gap-1 text-serenity text-xs font-medium hover:text-harbor disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Send className="w-3.5 h-3.5" /> Dispense
+                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => openAddStock(d)}
+                        className="flex items-center gap-1 text-sage text-xs font-medium hover:text-harbor"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add Stock
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -145,61 +214,64 @@ export default function Pharmacy() {
         </table>
       </div>
 
-      {dispenseTarget && (
+      {/* existing dispense modal stays exactly as-is below this point */}
+
+      {stockTarget && (
         <div className="fixed inset-0 bg-harbor/40 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="font-display text-lg font-semibold text-harbor">Dispense Medication</h3>
-                <p className="text-xs text-slate mt-0.5">{dispenseTarget.name} {dispenseTarget.strength} — {dispenseTarget.stock_quantity} in stock</p>
-              </div>
-              <button onClick={() => setDispenseTarget(null)} className="text-slate hover:text-harbor">
-                <X className="w-5 h-5" />
-              </button>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-harbor">Add Stock — {stockTarget.name}</h3>
+              <button onClick={() => setStockTarget(null)}><X className="w-4 h-4 text-slate" /></button>
             </div>
-            <form onSubmit={handleDispense} className="space-y-3">
+            <form onSubmit={handleAddStock} className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate mb-1">Patient</label>
-                <select
-                  value={form.patient}
-                  onChange={(e) => setForm({ ...form, patient: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity bg-white"
-                >
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>{p.full_name} ({p.admission_id})</option>
-                  ))}
-                </select>
+                <label className="text-xs text-slate">Quantity to add</label>
+                <input
+                  type="number" min="1" value={stockForm.quantity}
+                  onChange={(e) => setStockForm({ ...stockForm, quantity: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-slate">Buying price</label>
+                  <input
+                    type="number" min="0" step="0.01" value={stockForm.buying_price}
+                    onChange={(e) => setStockForm({ ...stockForm, buying_price: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-slate">Selling price</label>
+                  <input
+                    type="number" min="0" step="0.01" value={stockForm.selling_price}
+                    onChange={(e) => setStockForm({ ...stockForm, selling_price: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate mb-1">Quantity</label>
+                <label className="text-xs text-slate">Batch number</label>
                 <input
-                  type="number"
-                  min="1"
-                  max={dispenseTarget.stock_quantity}
-                  value={form.quantity}
-                  onChange={(e) => setForm({ ...form, quantity: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                  value={stockForm.batch_number}
+                  onChange={(e) => setStockForm({ ...stockForm, batch_number: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 text-sm"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate mb-1">Notes (optional)</label>
+                <label className="text-xs text-slate">Supplier</label>
                 <input
-                  type="text"
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                  value={stockForm.supplier}
+                  onChange={(e) => setStockForm({ ...stockForm, supplier: e.target.value })}
+                  className="w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 text-sm"
                 />
               </div>
-
-              {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
-
+              {stockError && <p className="text-xs text-red-500">{stockError}</p>}
               <button
-                type="submit"
-                disabled={submitting}
-                className="w-full flex items-center justify-center gap-2 bg-serenity text-white font-medium py-2.5 rounded-lg hover:bg-harbor transition-colors disabled:opacity-60 mt-2"
+                type="submit" disabled={stockSubmitting}
+                className="w-full py-2.5 rounded-lg bg-serenity text-white text-sm font-medium hover:bg-harbor disabled:opacity-50"
               >
-                {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                {submitting ? 'Dispensing...' : 'Confirm Dispense'}
+                {stockSubmitting ? 'Saving...' : 'Add Stock'}
               </button>
             </form>
           </div>

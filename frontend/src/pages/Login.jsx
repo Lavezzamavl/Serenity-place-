@@ -73,6 +73,11 @@ export default function Login({ onLogin }) {
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
+          {loading && (
+            <p className="text-xs text-slate/60 text-center mt-2">
+              First request may take up to a minute if the server was asleep.
+            </p>
+          )}
         </form>
       </div>
     </div>

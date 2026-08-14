@@ -63,7 +63,10 @@ INSTALLED_APPS = [
     'hr',
     'reports',
     'facility_settings',
-    'audit_trail'
+    'audit_trail',
+    'appointment',
+    'doctor', 
+    'patient',
 ]
 
 MIDDLEWARE = [

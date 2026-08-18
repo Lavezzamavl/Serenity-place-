@@ -6,3 +6,4 @@ venv/
 
 # files
 test.js
+.env

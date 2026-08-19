@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'reports',
     'facility_settings',
     'audit_trail',
+    'appointments',
 
     
 ]

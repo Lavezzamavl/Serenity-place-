@@ -18,6 +18,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/auth/', include('accounts.urls')),
     path('api/patients/', include('patients.urls')),
+    path('api/appointments/', include('appointments.urls')),
     path('api/pharmacy/', include('pharmacy.urls')),
     path('api/billing/', include('billing.urls')),
     path('api/nursing/', include('nursing.urls')),
@@ -26,5 +27,5 @@ urlpatterns = [
     path('api/reports/', include('reports.urls')),
     path('api/settings/', include('facility_settings.urls')),
     path('api/audit/', include('audit_trail.urls')),
-    path('api/appointments/', include('appointment.urls')),
+   
 ]

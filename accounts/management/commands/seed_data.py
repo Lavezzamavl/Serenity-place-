@@ -5,6 +5,7 @@ from accounts.models import Module, Role, RolePermission
 MODULES = [
     ('dashboard', 'Dashboard', 'LayoutDashboard'),
     ('patients', 'Patient Management', 'Users'),
+    ('appointments', 'Appointments', 'CalendarClock'),
     ('emr', 'EMR', 'FileText'),
     ('pharmacy', 'Pharmacy', 'Pill'),
     ('nursing', 'Nursing', 'Stethoscope'),
@@ -20,11 +21,12 @@ MODULES = [
 ROLES = {
     'Super Administrator': {
         key: (True, True, True, True)
-        for key in ['dashboard', 'patients', 'emr', 'pharmacy', 'nursing', 'lab', 'billing', 'inventory', 'hr', 'reports', 'settings']
+        for key in ['dashboard', 'patients', 'appointments', 'emr', 'pharmacy', 'nursing', 'lab', 'billing', 'inventory', 'hr', 'reports', 'settings']
     },
     'Director': {
         'dashboard': (True, False, False, False),
         'patients': (True, False, False, False),
+        'appointments': (True, False, False, False),
         'emr': (True, False, False, False),
         'billing': (True, False, False, False),
         'reports': (True, False, False, False),
@@ -33,18 +35,21 @@ ROLES = {
     'Psychiatrist': {
         'dashboard': (True, False, False, False),
         'patients': (True, False, True, False),
+        'appointments': (True, False, True, False),
         'emr': (True, True, True, False),
         'reports': (True, False, False, False),
     },
     'Nurse': {
         'dashboard': (True, False, False, False),
         'patients': (True, False, True, False),
+        'appointments': (True, False, False, False),
         'nursing': (True, True, True, False),
         'emr': (True, True, True, False),
     },
     'Receptionist': {
         'dashboard': (True, False, False, False),
         'patients': (True, True, True, False),  # can register/admit patients
+        'appointments': (True, True, True, True),  # schedules on doctors' behalf
     },
     'Pharmacist': {
         'dashboard': (True, False, False, False),

@@ -11,6 +11,13 @@ class CounselingSessionViewSet(viewsets.ModelViewSet):
     permission_classes = [HasModulePermission]
     module_key = 'counseling'
 
+    def get_queryset(self):
+        queryset = CounselingSession.objects.select_related('patient', 'counselor').all()
+        patient_id = self.request.query_params.get('patient')
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+        return queryset
+    
     def perform_create(self, serializer):
         session = serializer.save(counselor=self.request.user)
         log_action(

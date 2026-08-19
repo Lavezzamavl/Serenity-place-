@@ -83,12 +83,20 @@ class DispenseRecord(models.Model):
     drug = models.ForeignKey(Drug, on_delete=models.PROTECT, related_name='dispense_records')
     patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='medications')
     quantity = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+    unit_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        validators=[MinValueValidator(0)]
+    )
     dispensed_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     dispensed_at = models.DateTimeField(auto_now_add=True)
     notes = models.CharField(max_length=255, blank=True)
 
     class Meta:
         ordering = ['-dispensed_at']
+        
+    @property
+    def total_charge(self):
+        return self.quantity * self.unit_price
 
     def __str__(self):
         return f"{self.quantity}x {self.drug.name} -> {self.patient.admission_id}"

@@ -8,6 +8,7 @@ MODULES = [
     ('appointments', 'Appointments', 'CalendarClock'),
     ('emr', 'EMR', 'FileText'),
     ('pharmacy', 'Pharmacy', 'Pill'),
+    ('dispensing', 'Dispensing', 'ClipboardList'),
     ('nursing', 'Nursing', 'Stethoscope'),
     ('lab', 'Laboratory', 'FlaskConical'),
     ('billing', 'Billing & Finance', 'Receipt'),
@@ -21,7 +22,7 @@ MODULES = [
 ROLES = {
     'Super Administrator': {
         key: (True, True, True, True)
-        for key in ['dashboard', 'patients', 'appointments', 'emr', 'pharmacy', 'nursing', 'lab', 'billing', 'inventory', 'hr', 'reports', 'settings']
+        for key in ['dashboard', 'patients', 'appointments', 'emr', 'pharmacy', 'dispensing', 'nursing', 'lab', 'billing', 'inventory', 'hr', 'reports', 'settings']
     },
     'Director': {
         'dashboard': (True, False, False, False),
@@ -54,6 +55,7 @@ ROLES = {
     'Pharmacist': {
         'dashboard': (True, False, False, False),
         'pharmacy': (True, True, True, False),
+        'dispensing': (True, True, True, False),
         'inventory': (True, True, True, False),
     },
     'Accountant': {

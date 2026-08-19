@@ -16,7 +16,7 @@ class DispenseRecordViewSet(viewsets.ModelViewSet):
     queryset = DispenseRecord.objects.all()
     serializer_class = DispenseRecordSerializer
     permission_classes = [HasModulePermission]
-    module_key = 'pharmacy'
+    module_key = 'dispensing'
 
     def perform_create(self, serializer):
         record = serializer.save(dispensed_by=self.request.user)

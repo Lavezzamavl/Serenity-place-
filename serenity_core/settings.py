@@ -64,9 +64,8 @@ INSTALLED_APPS = [
     'reports',
     'facility_settings',
     'audit_trail',
-    'appointment',
-    'doctor', 
-    'patient',
+
+    
 ]
 
 MIDDLEWARE = [

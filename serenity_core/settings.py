@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     'facility_settings',
     'audit_trail',
     'appointments',
+    'counseling',
 
     
 ]

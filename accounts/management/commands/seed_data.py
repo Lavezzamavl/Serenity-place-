@@ -16,13 +16,14 @@ MODULES = [
     ('hr', 'Human Resources', 'Briefcase'),
     ('reports', 'Reports', 'BarChart3'),
     ('settings', 'Settings', 'Settings'),
+        ('counseling', 'Counseling', 'HeartHandshake'),
 ]
 
 # module_key -> (can_view, can_create, can_edit, can_delete)
 ROLES = {
     'Super Administrator': {
         key: (True, True, True, True)
-        for key in ['dashboard', 'patients', 'appointments', 'emr', 'pharmacy', 'dispensing', 'nursing', 'lab', 'billing', 'inventory', 'hr', 'reports', 'settings']
+        for key in ['dashboard', 'patients', 'appointments', 'emr', 'pharmacy', 'dispensing', 'nursing', 'lab', 'billing', 'inventory', 'hr', 'reports', 'settings','counseling']
     },
     'Director': {
         'dashboard': (True, False, False, False),
@@ -62,6 +63,22 @@ ROLES = {
         'dashboard': (True, False, False, False),
         'billing': (True, True, True, False),
         'reports': (True, False, False, False),
+    },
+        'Psychiatrist': {
+        'dashboard': (True, False, False, False),
+        'patients': (True, False, True, False),
+        'appointments': (True, False, True, False),
+        'emr': (True, True, True, False),
+        'counseling': (True, True, True, False),
+        'reports': (True, False, False, False),
+    },
+    'Nurse': {
+        'dashboard': (True, False, False, False),
+        'patients': (True, False, True, False),
+        'appointments': (True, False, False, False),
+        'nursing': (True, True, True, False),
+        'emr': (True, True, True, False),
+        'counseling': (True, True, True, False),
     },
 }
 

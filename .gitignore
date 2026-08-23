@@ -1,0 +1,9 @@
+## Simple .gitignore file
+
+# folders
+__pycache__/
+venv/
+
+# files
+test.js
+.env

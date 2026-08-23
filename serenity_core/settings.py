@@ -11,19 +11,25 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config, Csv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
-
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-gy-@5lk))oyfy4&x6bsa&vb*(pxt-uucd5txv%l(9i+r*ck16t'
+# Reads from the SECRET_KEY env var / .env file. The fallback below is only
+# for first-run local dev convenience — it is NOT safe to deploy with it.
+# Generate a real one with: python -c "import secrets; print(secrets.token_urlsafe(50))"
+SECRET_KEY = config(
+    'SECRET_KEY',
+    default='django-insecure-local-dev-only-CHANGE-ME-do-not-deploy-with-this-value',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Defaults to False so a missing env var fails safe instead of leaking
+# stack traces/settings on a live deployment.
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 # Security hardening - only active when DEBUG=False (i.e. in production)
 if not DEBUG:
@@ -33,13 +39,13 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    
 
-ALLOWED_HOSTS = [
-    "localhost",
-    "127.0.0.1",
-    ".onrender.com",
-]
+
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='localhost,127.0.0.1,.onrender.com',
+    cast=Csv(),
+)
 
 
 # Application definition
@@ -66,8 +72,6 @@ INSTALLED_APPS = [
     'audit_trail',
     'appointments',
     'counseling',
-
-    
 ]
 
 MIDDLEWARE = [
@@ -104,13 +108,29 @@ WSGI_APPLICATION = 'serenity_core.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+#
+# CRITICAL: Render's web service filesystem is ephemeral — anything written
+# to disk (including a SQLite file) is wiped on every deploy, restart, or
+# scale event. Running this in production on SQLite means patient records,
+# invoices, and counseling notes can vanish without warning.
+#
+# If DATABASE_URL is set (e.g. a Render/Postgres add-on connection string),
+# use it. Otherwise fall back to local SQLite for local dev only.
+import dj_database_url
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = config('DATABASE_URL', default='')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -150,10 +170,11 @@ USE_TZ = True
 STATIC_URL = 'static/'
 AUTH_USER_MODEL = 'accounts.User'
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "https://serenity-place-qgdhtba0x-nate-aec9.vercel.app",  # your Vite dev server
-]
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:5173',
+    cast=Csv(),
+)
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https://serenity-place-.*\.vercel\.app$",
 ]

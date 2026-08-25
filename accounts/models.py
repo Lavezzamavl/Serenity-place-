@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.conf import settings
 
 
 class Role(models.Model):
@@ -70,6 +71,26 @@ class User(AbstractUser):
 
     # Spec: "new accounts must remain inactive until approved by an administrator"
     is_approved = models.BooleanField(default=False)
+    
+        # --- MFA -----------------------------------------------------------
+    mfa_enabled = models.BooleanField(default=False)
+    mfa_secret = models.CharField(
+        max_length=64, blank=True,
+        help_text="Base32 TOTP secret. Only ever read/written server-side; never serialized out."
+    )
+
+    # --- Brute-force / account lockout ----------------------------------
+    failed_login_attempts = models.PositiveSmallIntegerField(default=0)
+    locked_until = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Set when failed_login_attempts exceeds the threshold; login is blocked until this time."
+    )
+
+    # --- Session policy --------------------------------------------------
+    allow_multiple_sessions = models.BooleanField(
+        default=False,
+        help_text="If False (default), a new login blacklists this user's other active refresh tokens."
+    )
 
     # Spec: MFA is optional per user
     mfa_enabled = models.BooleanField(default=False)
@@ -78,4 +99,14 @@ class User(AbstractUser):
 
     def __str__(self):
         return f"{self.username} ({self.role.name if self.role else 'No role'})"
-# Create your models here.
+
+class PasswordHistory(models.Model):
+    """Stores hashed copies of a user's previous passwords so
+    PasswordHistoryValidator can block reuse."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='password_history')
+    hashed_password = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        

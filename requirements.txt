@@ -7,3 +7,5 @@ python-decouple
 dj-database-url
 gunicorn
 whitenoise
+pyotp>=2.9
+qrcode[pil]>=7.4

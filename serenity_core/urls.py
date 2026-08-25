@@ -28,4 +28,6 @@ urlpatterns = [
     path('api/settings/', include('facility_settings.urls')),
     path('api/audit/', include('audit_trail.urls')),
     path('api/counseling/', include('counseling.urls')),
+    path('api/laboratory/', include('laboratory.urls')),
+        path('api/notifications/', include('notifications.urls')),
 ]

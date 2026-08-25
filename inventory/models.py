@@ -13,6 +13,11 @@ class InventoryItem(models.Model):
     quantity = models.PositiveIntegerField(default=0)
     min_stock = models.PositiveIntegerField(default=10)
     supplier = models.CharField(max_length=150, blank=True)
+    unit_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Charged to the patient's bill when used via ConsumableUsage."
+    )
 
     @property
     def status(self):

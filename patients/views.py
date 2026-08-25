@@ -2,14 +2,14 @@ from rest_framework import viewsets
 from .models import Patient, ProgressNote
 from .serializers import PatientSerializer, ProgressNoteSerializer
 from .permissions import HasModulePermission
-from audit_trail.mixins import AuditedViewSetMixin
+from audit_trail.mixins import AuditLoggingMixin
 from audit_trail.utils import log_action
 
-class PatientViewSet(viewsets.ModelViewSet):
+class PatientViewSet(AuditLoggingMixin,viewsets.ModelViewSet):
     queryset = Patient.objects.select_related('created_by').order_by('-id')
     serializer_class = PatientSerializer
     permission_classes = [HasModulePermission]
-    module_key = 'patients'
+    audit_module = 'patients'
 
     def perform_create(self, serializer):
         patient = serializer.save(created_by=self.request.user)

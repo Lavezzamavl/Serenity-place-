@@ -22,9 +22,15 @@ export default function App() {
       .finally(() => setCheckingSession(false));
   }, []);
 
+
   const handleLogin = (userData) => {
     setUser(userData);
     setActiveModule('dashboard');
+  };
+  // Lets a page (e.g. Settings, after enabling/disabling MFA) patch fields
+  // on the logged-in user without a full re-fetch of /auth/me/.
+  const handleUserUpdate = (patch) => {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   };
 
   const handleLogout = () => {
@@ -49,6 +55,7 @@ export default function App() {
           activeModule={activeModule}
           setActiveModule={setActiveModule}
           onLogout={handleLogout}
+          onUserUpdate={handleUserUpdate}
         />
       )}
     </ErrorBoundary>

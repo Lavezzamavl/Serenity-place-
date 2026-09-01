@@ -35,7 +35,7 @@ const MODULE_COMPONENTS = {
   settings: SettingsPage,
 };
 
-export default function Layout({ user, activeModule, setActiveModule, onLogout }) {
+export default function Layout({ user, activeModule, setActiveModule, onLogout, onUserUpdate }) {
   const activeModuleMeta = MODULES.find((m) => m.key === activeModule);
   const ActiveComponent = MODULE_COMPONENTS[activeModule] || Placeholder;
 
@@ -45,7 +45,7 @@ export default function Layout({ user, activeModule, setActiveModule, onLogout }
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar user={user} onLogout={onLogout} moduleLabel={activeModuleMeta?.label} />
         <main className="flex-1 overflow-y-auto p-6">
-          <ActiveComponent user={user} />
+          <ActiveComponent user={user} onUserUpdate={onUserUpdate} />
         </main>
       </div>
     </div>

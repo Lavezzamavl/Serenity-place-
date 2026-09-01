@@ -19,7 +19,6 @@ MODULES = [
         ('counseling', 'Counseling', 'HeartHandshake'),
 ]
 
-# module_key -> (can_view, can_create, can_edit, can_delete)
 ROLES = {
     'Super Administrator': {
         key: (True, True, True, True)
@@ -50,8 +49,8 @@ ROLES = {
     },
     'Receptionist': {
         'dashboard': (True, False, False, False),
-        'patients': (True, True, True, False),  # can register/admit patients
-        'appointments': (True, True, True, True),  # schedules on doctors' behalf
+        'patients': (True, True, True, False),
+        'appointments': (True, True, True, True),
     },
     'Pharmacist': {
         'dashboard': (True, False, False, False),
@@ -95,6 +94,9 @@ class Command(BaseCommand):
 
         for role_name, module_perms in ROLES.items():
             role, _ = Role.objects.get_or_create(name=role_name, defaults={'is_system_role': True})
+            if role_name == 'Super Administrator' and not role.is_admin_role:
+                role.is_admin_role = True
+                role.save(update_fields=['is_admin_role'])
             for key, (can_view, can_create, can_edit, can_delete) in module_perms.items():
                 RolePermission.objects.update_or_create(
                     role=role,

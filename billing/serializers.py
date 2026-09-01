@@ -16,7 +16,7 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Payment
-        fields = ['id', 'invoice', 'amount', 'method', 'received_by_name', 'received_at']
+        fields = ['id', 'invoice', 'amount', 'method', 'mpesa_code', 'received_by_name', 'received_at']
         read_only_fields = ['received_at']
 
     def get_received_by_name(self, obj):
@@ -26,17 +26,34 @@ class PaymentSerializer(serializers.ModelSerializer):
         return full or obj.received_by.username
 
     def validate(self, attrs):
-        invoice = attrs['invoice']
-        amount = attrs['amount']
-        if amount > invoice.balance:
-            raise serializers.ValidationError({
-                'amount': f"Payment of {amount} exceeds outstanding balance of {invoice.balance}."
-            })
+        # On update (PATCH, e.g. fixing up the mpesa_code afterwards),
+        # attrs only has the fields being changed - fall back to the
+        # existing instance for anything not in this request.
+        invoice = attrs.get('invoice') or (self.instance.invoice if self.instance else None)
+        amount = attrs.get('amount') if 'amount' in attrs else (self.instance.amount if self.instance else None)
+        if invoice is not None and amount is not None:
+            balance = invoice.balance
+            if self.instance and self.instance.invoice_id == invoice.id:
+                # Adjusting an existing payment's own amount shouldn't be
+                # penalized by the balance it already contributed.
+                balance += self.instance.amount
+            if amount > balance:
+                raise serializers.ValidationError({
+                    'amount': f"Payment of {amount} exceeds outstanding balance of {balance}."
+                })
         return attrs
 
     def create(self, validated_data):
         with transaction.atomic():
             payment = Payment.objects.create(**validated_data)
+            payment.invoice.refresh_status()
+        return payment
+
+    def update(self, instance, validated_data):
+        # Covers the "mpesa code can be adjusted later" case, and keeps
+        # the invoice status correct if the amount itself is corrected.
+        with transaction.atomic():
+            payment = super().update(instance, validated_data)
             payment.invoice.refresh_status()
         return payment
 

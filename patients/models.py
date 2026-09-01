@@ -62,9 +62,29 @@ class Patient(models.Model):
         help_text="Format: systolic/diastolic, e.g. 120/80"
     )
 
+    sponsor_name = models.CharField(max_length=150, blank=True)
+    sponsor_phone = models.CharField(max_length=20, blank=True)
+    sponsor_relationship = models.CharField(
+        max_length=100, blank=True,
+        help_text="e.g. Employer, NHIF, Self, Family"
+    )
+
+    next_of_kin_name = models.CharField(max_length=150, blank=True)
+    next_of_kin_relationship = models.CharField(max_length=100, blank=True)
+    next_of_kin_phone = models.CharField(max_length=20, blank=True)
+
     created_by = models.ForeignKey(
         'accounts.User', on_delete=models.SET_NULL, null=True, related_name='admitted_patients'
     )
+
+    @property
+    def days_admitted(self):
+        """Days since admission_date. While still Admitted, counts up to
+        today; once Discharged, freezes at the discharge date so the
+        number doesn't keep climbing after the patient has left."""
+        from datetime import date
+        end = self.discharged_at.date() if self.discharged_at else date.today()
+        return (end - self.admission_date).days
 
     def save(self, *args, **kwargs):
         if not self.admission_id:

@@ -4,14 +4,17 @@ from .models import Patient, ProgressNote
 
 class PatientSerializer(serializers.ModelSerializer):
     bmi = serializers.SerializerMethodField()
+    days_admitted = serializers.ReadOnlyField()
 
     class Meta:
         model = Patient
         fields = [
             'id', 'admission_id', 'full_name', 'age', 'gender', 'ward',
-            'diagnosis', 'status', 'admission_date', 'discharged_at',
+            'diagnosis', 'status', 'admission_date', 'discharged_at', 'days_admitted',
             'height_cm', 'weight_kg', 'temperature_c', 'pulse_bpm', 'blood_pressure',
             'bmi',
+            'sponsor_name', 'sponsor_phone', 'sponsor_relationship',
+            'next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone',
         ]
         read_only_fields = ['admission_id', 'admission_date', 'discharged_at']
 

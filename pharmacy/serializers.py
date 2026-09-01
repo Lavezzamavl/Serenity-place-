@@ -52,7 +52,6 @@ class DispenseRecordSerializer(serializers.ModelSerializer):
     drug_name = serializers.CharField(source='drug.name', read_only=True)
     patient_name = serializers.CharField(source='patient.full_name', read_only=True)
     dispensed_by_name = serializers.SerializerMethodField()
-    unit_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     total_charge = serializers.ReadOnlyField()
 
     class Meta:
@@ -60,7 +59,13 @@ class DispenseRecordSerializer(serializers.ModelSerializer):
         fields = ['id', 'drug', 'drug_name', 'patient', 'patient_name',
                   'quantity', 'unit_price', 'total_charge',
                   'dispensed_by_name', 'dispensed_at', 'notes']
-        read_only_fields = ['dispensed_at']
+        # unit_price is read-only here on purpose: once stock has been
+        # captured (via StockAddition, admin-only), the selling_price on
+        # the Drug is the single source of truth for what dispensing
+        # charges. Nurses/pharmacists dispense at that price and cannot
+        # submit their own — see create() below, which always pulls it
+        # from drug.selling_price regardless of what the request sends.
+        read_only_fields = ['dispensed_at', 'unit_price']
 
     def get_dispensed_by_name(self, obj):
         if not obj.dispensed_by:
@@ -75,15 +80,15 @@ class DispenseRecordSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'quantity': f"Only {drug.stock_quantity} units of {drug.name} in stock — cannot dispense {quantity}."
             })
-        if not attrs.get('unit_price'):
-            attrs['unit_price'] = drug.selling_price
         return attrs
 
     def create(self, validated_data):
         with transaction.atomic():
             drug = validated_data['drug']
             quantity = validated_data['quantity']
-            unit_price = validated_data['unit_price']
+            # Always the drug's current selling_price - never client input.
+            unit_price = drug.selling_price
+            validated_data['unit_price'] = unit_price
 
             drug.stock_quantity -= quantity
             drug.save()

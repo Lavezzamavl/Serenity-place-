@@ -78,6 +78,11 @@ class Payment(models.Model):
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='payments')
     amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0.01)])
     method = models.CharField(max_length=20, choices=METHOD_CHOICES)
+    mpesa_code = models.CharField(
+        max_length=20, blank=True,
+        help_text="M-Pesa transaction code, e.g. QAB1CD2EFG. Editable after "
+                   "capture in case it was mistyped or wasn't available yet."
+    )
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     received_at = models.DateTimeField(auto_now_add=True)
 

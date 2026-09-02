@@ -16,9 +16,10 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
 from audit_trail.utils import log_action
-from .models import User, PasswordHistory
-from .serializers import RegisterSerializer, UserSerializer
+from .models import User, PasswordHistory, Role
+from .serializers import RegisterSerializer, UserSerializer, RoleSerializer
 from .throttles import LoginRateThrottle, MFARateThrottle
+from patients.permissions import IsAdminRole
 
 MAX_FAILED_ATTEMPTS = 5
 LOCKOUT_MINUTES = 15
@@ -154,6 +155,14 @@ class ForceLogoutView(APIView):
             BlacklistedToken.objects.get_or_create(token=token)
         log_action(request, 'force_logout', module='auth', detail=target.username)
         return Response({"message": f"All sessions for {target.username} have been ended."})
+
+
+class RoleListView(generics.ListAPIView):
+    """GET /api/auth/roles/ - lets admins populate a role dropdown when
+    creating a new staff account, without going through Django admin."""
+    queryset = Role.objects.all().order_by('name')
+    serializer_class = RoleSerializer
+    permission_classes = [IsAdminRole]
 
 
 class MeView(APIView):

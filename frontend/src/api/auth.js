@@ -54,6 +54,11 @@ export async function mfaDisable(password) {
   return data;
 }
 
+export async function getRoles() {
+  const { data } = await api.get('/auth/roles/');
+  return data;
+}
+
 export async function forceLogoutUser(userId) {
   const { data } = await api.post(`/auth/users/${userId}/force-logout/`);
   return data;

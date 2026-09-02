@@ -1,3 +1,5 @@
+from django.utils import timezone
+from rest_framework import permissions
 from django.db import transaction
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -5,7 +7,7 @@ from rest_framework.response import Response
 from accounts.models import User
 from .models import StaffProfile, LeaveRequest
 from .serializers import (
-    StaffProfileSerializer, LeaveRequestSerializer,
+    StaffProfileSerializer, LeaveRequestSerializer, MyLeaveRequestSerializer,
     AvailableUserSerializer, StaffAccountCreateSerializer,
 )
 from patients.permissions import HasModulePermission, IsAdminRole
@@ -63,3 +65,24 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         log_action(request, f'leave_{decision.lower()}', module='hr',
                    detail=f"{leave.staff.user.username}: {leave.start_date} to {leave.end_date}")
         return Response(self.get_serializer(leave).data)
+
+    @action(detail=False, methods=['post'], url_path='request',
+            permission_classes=[permissions.IsAuthenticated])
+    def request_leave(self, request):
+        """POST /api/hr/leave-requests/request/ - lets the logged-in
+        user submit their own leave request (reason + return date).
+        Available to any authenticated staff member, independent of the
+        'hr' module permission that gates the rest of this viewset."""
+        staff_profile = getattr(request.user, 'staff_profile', None)
+        if not staff_profile:
+            return Response(
+                {'detail': 'No staff profile is linked to your account.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = MyLeaveRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        leave = serializer.save(staff=staff_profile, start_date=timezone.now().date())
+        log_action(request, 'leave_requested', module='hr',
+                   detail=f"{staff_profile.user.username}: back by {leave.end_date}")
+        return Response(LeaveRequestSerializer(leave).data, status=status.HTTP_201_CREATED)

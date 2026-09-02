@@ -9,3 +9,4 @@ gunicorn
 whitenoise
 pyotp>=2.9
 qrcode[pil]>=7.4
+requests

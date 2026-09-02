@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as Icons from 'lucide-react';
 import {
-  LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { getDashboardSummary } from '../api/reports';
@@ -13,6 +13,8 @@ const TONE_CLASSES = {
   red: 'bg-red-50 text-red-500',
 };
 
+const OCCUPANCY_COLORS = ['#3E7CB1', '#EAF1F6'];
+
 function buildStats(data) {
   return [
     { label: 'Current Admissions', value: data.current_admissions, icon: 'Users', tone: 'serenity' },
@@ -23,7 +25,20 @@ function buildStats(data) {
     { label: 'Outstanding Balances', value: `KES ${data.total_outstanding_balance.toLocaleString()}`, icon: 'AlertCircle', tone: 'red' },
     { label: 'Pharmacy Stock Alerts', value: data.pharmacy_stock_alerts, icon: 'Pill', tone: 'red' },
     { label: 'Inventory Stock Alerts', value: data.inventory_stock_alerts, icon: 'Package', tone: 'red' },
+    { label: 'Active Staff', value: data.total_staff, icon: 'Briefcase', tone: 'serenity' },
+    { label: 'Pending Leave Requests', value: data.pending_leave_requests, icon: 'CalendarClock', tone: 'slate' },
   ];
+}
+
+function timeAgo(timestamp) {
+  const diffMs = Date.now() - new Date(timestamp).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 export default function Dashboard({ user }) {
@@ -80,10 +95,43 @@ export default function Dashboard({ user }) {
           </div>
 
           {/* Charts */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 lg:col-span-1">
+              <h4 className="font-medium text-harbor mb-4">Occupancy Rate</h4>
+              <div className="relative">
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Occupied', value: data.occupancy_rate },
+                        { name: 'Available', value: Math.max(100 - data.occupancy_rate, 0) },
+                      ]}
+                      dataKey="value"
+                      innerRadius={60}
+                      outerRadius={80}
+                      startAngle={90}
+                      endAngle={-270}
+                      stroke="none"
+                    >
+                      {OCCUPANCY_COLORS.map((color) => (
+                        <Cell key={color} fill={color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="font-display text-2xl font-semibold text-harbor">{data.occupancy_rate}%</span>
+                  <span className="text-xs text-slate">occupied</span>
+                </div>
+              </div>
+              <p className="text-xs text-slate text-center mt-2">
+                {data.current_admissions} of {data.current_admissions + data.available_beds} beds in use
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 lg:col-span-1">
               <h4 className="font-medium text-harbor mb-4">Revenue Trend (KES, millions)</h4>
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={data.revenue_trend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EAF1F6" />
                   <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#5B6B79' }} axisLine={false} tickLine={false} />
@@ -94,9 +142,9 @@ export default function Dashboard({ user }) {
               </ResponsiveContainer>
             </div>
 
-            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 lg:col-span-1">
               <h4 className="font-medium text-harbor mb-4">Admissions vs Discharges</h4>
-              <ResponsiveContainer width="100%" height={240}>
+              <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={data.admission_trend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EAF1F6" />
                   <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#5B6B79' }} axisLine={false} tickLine={false} />
@@ -107,6 +155,29 @@ export default function Dashboard({ user }) {
                   <Bar dataKey="discharges" fill="#7FA895" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Recent activity feed */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+              <Icons.Activity className="w-4 h-4 text-serenity" />
+              <h4 className="font-medium text-harbor">Recent Activity</h4>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {data.recent_activity.length === 0 && (
+                <p className="text-center py-8 text-slate/60 text-sm">No recent activity yet.</p>
+              )}
+              {data.recent_activity.map((entry) => (
+                <div key={entry.id} className="px-5 py-3 flex items-start justify-between gap-4">
+                  <p className="text-sm text-harbor">
+                    <span className="font-medium">{entry.actor_name}</span>{' '}
+                    <span className="text-slate">{entry.action.toLowerCase()}</span>{' '}
+                    {entry.object_repr && <span className="text-slate">— {entry.object_repr}</span>}
+                  </p>
+                  <span className="text-xs text-slate/60 whitespace-nowrap">{timeAgo(entry.timestamp)}</span>
+                </div>
+              ))}
             </div>
           </div>
         </>

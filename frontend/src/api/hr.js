@@ -32,3 +32,10 @@ export async function createStaffAccount(payload) {
   const { data } = await api.post('/hr/staff/create-with-account/', payload);
   return data;
 }
+// Self-service: the logged-in user requests their own leave with a
+// reason and expected return date. Bypasses the 'hr' module permission
+// check on the backend, since any staff member can request leave.
+export async function requestLeave(payload) {
+  const { data } = await api.post('/hr/leave-requests/request/', payload);
+  return data;
+}

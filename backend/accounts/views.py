@@ -163,6 +163,7 @@ class RoleListView(generics.ListAPIView):
     queryset = Role.objects.all().order_by('name')
     serializer_class = RoleSerializer
     permission_classes = [IsAdminRole]
+    pagination_class = None
 
 
 class MeView(APIView):

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { HeartPulse, ClipboardList, AlertTriangle, Plus, Loader2 } from 'lucide-react';
-import { getPatients } from '../api/patients';
+import { HeartPulse, ClipboardList, AlertTriangle, Plus, Loader2, Sparkles } from 'lucide-react';
+import { getPatients, summarizePatient } from '../api/patients';
 import { getProgressNotes, addProgressNote } from '../api/emr';
 
 const DEFAULT_CLINICAL = {
@@ -26,6 +26,10 @@ export default function EMR() {
   const [posting, setPosting] = useState(false);
   const [noteError, setNoteError] = useState('');
 
+  const [aiSummary, setAiSummary] = useState('');
+  const [summarizing, setSummarizing] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+
   // Load all patients once, select the first by default
   useEffect(() => {
     getPatients()
@@ -37,12 +41,15 @@ export default function EMR() {
   }, []);
 
   // Whenever the selected patient changes, load THEIR notes from the real API
+  // and clear out any AI summary from the previously selected patient.
   useEffect(() => {
     if (!selectedPatient) return;
     setLoadingNotes(true);
     getProgressNotes(selectedPatient.admission_id)
       .then(setNotes)
       .finally(() => setLoadingNotes(false));
+    setAiSummary('');
+    setSummaryError('');
   }, [selectedPatient]);
 
   const handleAddNote = async (e) => {
@@ -62,6 +69,24 @@ export default function EMR() {
       );
     } finally {
       setPosting(false);
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    if (!selectedPatient) return;
+    setSummarizing(true);
+    setSummaryError('');
+    try {
+      const summary = await summarizePatient(selectedPatient.id);
+      setAiSummary(summary);
+    } catch (err) {
+      setSummaryError(
+        err.response?.status === 403
+          ? "Your role doesn't have permission to generate AI summaries."
+          : 'Could not generate a summary right now. Please try again.'
+      );
+    } finally {
+      setSummarizing(false);
     }
   };
 
@@ -110,6 +135,30 @@ export default function EMR() {
             <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${RISK_STYLES[DEFAULT_CLINICAL.riskLevel]}`}>
               <AlertTriangle className="w-3.5 h-3.5" /> {DEFAULT_CLINICAL.riskLevel} Risk
             </span>
+          </div>
+
+          {/* AI-generated shift-handover summary */}
+          <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div className="flex items-center justify-between gap-4 flex-wrap mb-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-serenity" />
+                <h4 className="font-medium text-harbor">AI Shift Summary</h4>
+              </div>
+              <button
+                onClick={handleGenerateSummary}
+                disabled={summarizing}
+                className="flex items-center gap-1.5 bg-serenity text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-harbor transition-colors disabled:opacity-60"
+              >
+                {summarizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                {summarizing ? 'Generating...' : aiSummary ? 'Regenerate' : 'Generate Summary'}
+              </button>
+            </div>
+            {summaryError && <p className="text-xs text-red-500 mb-2">{summaryError}</p>}
+            {aiSummary ? (
+              <p className="text-sm text-slate whitespace-pre-line">{aiSummary}</p>
+            ) : (
+              !summarizing && <p className="text-sm text-slate/50">Generate a concise handover summary from this patient's recent notes and vitals.</p>
+            )}
           </div>
 
           {/* Real vitals, taken straight from the admission record */}

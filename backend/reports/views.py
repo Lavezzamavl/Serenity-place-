@@ -6,6 +6,8 @@ from pharmacy.models import Drug
 from inventory.models import InventoryItem
 from billing.models import Invoice, Payment
 from facility_settings.models import FacilitySettings
+from hr.models import StaffProfile, LeaveRequest
+from audit_trail.models import AuditLog
 from datetime import date, timedelta
 from calendar import month_abbr
 
@@ -66,6 +68,10 @@ class DashboardSummaryView(APIView):
         admitted_qs = Patient.objects.filter(status='Admitted')
         current_admissions = admitted_qs.count()
         available_beds = max(settings_obj.total_beds - current_admissions, 0)
+        occupancy_rate = (
+            round((current_admissions / settings_obj.total_beds) * 100, 1)
+            if settings_obj.total_beds else 0
+        )
 
         new_admissions_today = Patient.objects.filter(admission_date=today).count()
         discharged_this_week = Patient.objects.filter(
@@ -85,6 +91,9 @@ class DashboardSummaryView(APIView):
 
         low_stock_drugs = [d for d in Drug.objects.all() if d.status != 'OK']
         low_stock_inventory = [i for i in InventoryItem.objects.all() if i.status != 'OK']
+
+        total_staff = StaffProfile.objects.filter(employment_status='Active').count()
+        pending_leave_requests = LeaveRequest.objects.filter(status='Pending').count()
 
         revenue_trend = []
         admission_trend = []
@@ -107,15 +116,34 @@ class DashboardSummaryView(APIView):
             revenue_trend.append({'month': label, 'revenue': round(month_revenue / 1_000_000, 2)})
             admission_trend.append({'month': label, 'admissions': month_admissions, 'discharges': month_discharges})
 
+        recent_activity = []
+        for log in AuditLog.objects.select_related('actor').order_by('-timestamp')[:8]:
+            actor_name = 'System'
+            if log.actor:
+                full = f"{log.actor.first_name} {log.actor.last_name}".strip()
+                actor_name = full or log.actor.username
+            recent_activity.append({
+                'id': log.id,
+                'actor_name': actor_name,
+                'action': log.get_action_display(),
+                'model_name': log.model_name,
+                'object_repr': log.object_repr,
+                'timestamp': log.timestamp,
+            })
+
         return Response({
             'current_admissions': current_admissions,
             'available_beds': available_beds,
+            'occupancy_rate': occupancy_rate,
             'new_admissions_today': new_admissions_today,
             'discharged_this_week': discharged_this_week,
             'revenue_this_month': revenue_this_month,
             'total_outstanding_balance': total_outstanding,
             'pharmacy_stock_alerts': len(low_stock_drugs),
             'inventory_stock_alerts': len(low_stock_inventory),
+            'total_staff': total_staff,
+            'pending_leave_requests': pending_leave_requests,
             'revenue_trend': revenue_trend,
             'admission_trend': admission_trend,
+            'recent_activity': recent_activity,
         })

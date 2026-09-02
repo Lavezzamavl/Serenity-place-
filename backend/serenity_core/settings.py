@@ -13,7 +13,7 @@ SECRET_KEY = config(
     'SECRET_KEY',
     default='django-insecure-local-dev-only-CHANGE-ME-do-not-deploy-with-this-value',
 )
-
+ANTHROPIC_API_KEY = config('ANTHROPIC_API_KEY', default='')
 DEBUG = config('DEBUG', default=False, cast=bool)
 
 # --- Security hardening - only active when DEBUG=False (i.e. in production) ---

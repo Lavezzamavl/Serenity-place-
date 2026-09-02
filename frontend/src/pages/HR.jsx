@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Briefcase, Check, X as XIcon, Loader2, Plus, X, UserPlus, Link2 } from 'lucide-react';
-import { getStaff, getLeaveRequests, reviewLeave, getAvailableUsers, addStaffFromExisting, createStaffAccount } from '../api/hr';
+import { getStaff, getLeaveRequests, reviewLeave, getAvailableUsers, addStaffFromExisting, createStaffAccount, requestLeave } from '../api/hr';
 import { getRoles } from '../api/auth';
 
 const STATUS_STYLES = {
@@ -14,6 +14,7 @@ const EMPTY_NEW_FORM = {
   username: '', email: '', first_name: '', last_name: '', phone_number: '', password: '',
   role: '', department: 'Clinical', position: '', date_hired: '',
 };
+const EMPTY_LEAVE_FORM = { end_date: '', reason: '' };
 
 export default function HR({ user }) {
   const [staff, setStaff] = useState([]);
@@ -32,6 +33,12 @@ export default function HR({ user }) {
   const [staffErrors, setStaffErrors] = useState({});
   const [staffSubmitting, setStaffSubmitting] = useState(false);
   const [staffApiError, setStaffApiError] = useState('');
+
+  const [showRequestLeave, setShowRequestLeave] = useState(false);
+  const [leaveForm, setLeaveForm] = useState(EMPTY_LEAVE_FORM);
+  const [leaveErrors, setLeaveErrors] = useState({});
+  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+  const [leaveApiError, setLeaveApiError] = useState('');
 
   const loadLeaves = () => getLeaveRequests().then(setLeaves);
   const loadStaff = () => getStaff().then(setStaff);
@@ -59,6 +66,13 @@ export default function HR({ user }) {
     setShowAdd(true);
     getAvailableUsers().then(setAvailableUsers).catch(() => setAvailableUsers([]));
     if (isAdmin) getRoles().then(setRoles).catch(() => setRoles([]));
+  };
+
+  const openRequestLeave = () => {
+    setLeaveForm(EMPTY_LEAVE_FORM);
+    setLeaveErrors({});
+    setLeaveApiError('');
+    setShowRequestLeave(true);
   };
 
   const submitLink = async (e) => {
@@ -122,13 +136,45 @@ export default function HR({ user }) {
     }
   };
 
+  const submitLeaveRequest = async (e) => {
+    e.preventDefault();
+    const errs = {};
+    if (!leaveForm.end_date) errs.end_date = 'Return date is required.';
+    if (!leaveForm.reason.trim()) errs.reason = 'Reason is required.';
+    setLeaveErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    setLeaveSubmitting(true);
+    setLeaveApiError('');
+    try {
+      const created = await requestLeave(leaveForm);
+      setLeaves((prev) => [created, ...prev]);
+      setShowRequestLeave(false);
+    } catch (err) {
+      const serverErrors = err.response?.data;
+      if (serverErrors && typeof serverErrors === 'object') {
+        setLeaveErrors(Object.fromEntries(Object.entries(serverErrors).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v])));
+      } else {
+        setLeaveApiError('Could not submit your leave request. Please try again.');
+      }
+    } finally {
+      setLeaveSubmitting(false);
+    }
+  };
+
   if (loading) return <div className="flex items-center justify-center py-16 text-slate"><Loader2 className="w-5 h-5 animate-spin mr-2" /> Loading HR data...</div>;
 
   return (
     <div className="space-y-5">
       {error && <p className="text-sm text-red-500 bg-red-50 px-4 py-2.5 rounded-lg">{error}</p>}
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={openRequestLeave}
+          className="flex items-center gap-2 bg-white border border-gray-200 text-harbor text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-mist transition-colors"
+        >
+          <Plus className="w-4 h-4" /> Request Leave
+        </button>
         <button
           onClick={openAddStaff}
           className="flex items-center gap-2 bg-serenity text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-harbor transition-colors"
@@ -404,6 +450,50 @@ export default function HR({ user }) {
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {showRequestLeave && (
+        <div className="fixed inset-0 bg-harbor/40 flex items-center justify-center z-50 px-4 py-8 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 my-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display text-lg font-semibold text-harbor">Request Leave</h3>
+              <button onClick={() => setShowRequestLeave(false)} className="text-slate hover:text-harbor"><X className="w-5 h-5" /></button>
+            </div>
+
+            <form onSubmit={submitLeaveRequest} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate mb-1">Reason</label>
+                <input
+                  value={leaveForm.reason}
+                  placeholder="e.g. Family emergency"
+                  onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                  className={`w-full px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2
+                    ${leaveErrors.reason ? 'border-red-300 focus:ring-red-400' : 'border-gray-200 focus:ring-serenity'}`}
+                />
+                {leaveErrors.reason && <p className="text-xs text-red-500 mt-1">{leaveErrors.reason}</p>}
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate mb-1">Date you'll return</label>
+                <input
+                  type="date"
+                  value={leaveForm.end_date}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
+                  className={`w-full px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2
+                    ${leaveErrors.end_date ? 'border-red-300 focus:ring-red-400' : 'border-gray-200 focus:ring-serenity'}`}
+                />
+                {leaveErrors.end_date && <p className="text-xs text-red-500 mt-1">{leaveErrors.end_date}</p>}
+              </div>
+
+              {leaveApiError && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{leaveApiError}</p>}
+
+              <button type="submit" disabled={leaveSubmitting} className="w-full flex items-center justify-center gap-2 bg-serenity text-white font-medium py-2.5 rounded-lg hover:bg-harbor disabled:opacity-60 mt-2">
+                {leaveSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                {leaveSubmitting ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </form>
           </div>
         </div>
       )}

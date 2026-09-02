@@ -50,6 +50,7 @@ class DoctorListView(ListAPIView):
     serializer_class = DoctorSerializer
     permission_classes = [HasModulePermission]
     module_key = 'appointments'
+    pagination_class = None 
 
     def get_queryset(self):
         return User.objects.filter(

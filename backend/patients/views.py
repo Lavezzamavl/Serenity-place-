@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from .models import Patient, ProgressNote
 from .serializers import PatientSerializer, ProgressNoteSerializer
 from .permissions import HasModulePermission
+from .ai_summary import generate_patient_summary
 from audit_trail.mixins import AuditLoggingMixin
 from audit_trail.utils import log_action
 
@@ -50,6 +51,20 @@ class PatientViewSet(AuditLoggingMixin,viewsets.ModelViewSet):
         patient.save()
         log_action(request, 'patient_readmitted', module='patients', detail=patient.admission_id)
         return Response(self.get_serializer(patient).data)
+
+    @action(detail=True, methods=['post'])
+    def summarize(self, request, pk=None):
+        """POST /api/patients/{id}/summarize/ - generates an AI-assisted
+        shift-handover summary from the patient's recent notes, vitals,
+        and medication administration records."""
+        patient = self.get_object()
+        try:
+            summary = generate_patient_summary(patient)
+        except RuntimeError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+        log_action(request, 'export', module='patients',
+                   object_id=patient.pk, detail=f"AI summary generated for {patient.admission_id}")
+        return Response({'summary': summary})
 
 
 class ProgressNoteViewSet(viewsets.ModelViewSet):

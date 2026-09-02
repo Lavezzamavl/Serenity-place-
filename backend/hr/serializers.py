@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
+from django.utils import timezone
 from accounts.models import User, Role
 from .models import StaffProfile, LeaveRequest
 
@@ -97,3 +98,18 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
         if attrs['end_date'] < attrs['start_date']:
             raise serializers.ValidationError({'end_date': 'End date cannot be before start date.'})
         return attrs
+
+class MyLeaveRequestSerializer(serializers.ModelSerializer):
+    """Self-service leave request: the logged-in staff member only
+    supplies a reason and their expected return date. start_date and
+    staff are filled in by the view from the request itself."""
+
+    class Meta:
+        model = LeaveRequest
+        fields = ['id', 'end_date', 'reason', 'status', 'start_date', 'requested_at']
+        read_only_fields = ['id', 'status', 'start_date', 'requested_at']
+
+    def validate_end_date(self, value):
+        if value < timezone.now().date():
+            raise serializers.ValidationError('Return date cannot be in the past.')
+        return value

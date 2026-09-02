@@ -21,6 +21,7 @@ from inventory.models import InventoryItem
 from nursing.models import MedicationAdministration
 from billing.models import Invoice
 from appointments.models import Appointment
+from hr.models import LeaveRequest
 
 
 def notify(recipients, category, message, dedupe_key):
@@ -34,7 +35,7 @@ def notify(recipients, category, message, dedupe_key):
 
 
 class Command(BaseCommand):
-    help = "Scans stock, MAR, billing and appointments for conditions that should notify staff."
+    help = "Scans stock, MAR, billing, appointments and HR for conditions that should notify staff."
 
     def handle(self, *args, **options):
         # Admin/director roles get every category; pharmacists/nurses/
@@ -51,6 +52,7 @@ class Command(BaseCommand):
         self._missed_medications(admins + nurses)
         self._outstanding_bills(admins + accountants)
         self._upcoming_reviews(admins)
+        self._pending_leave_requests(admins)
 
         self.stdout.write(self.style.SUCCESS("Notification scan complete."))
 
@@ -108,4 +110,17 @@ class Command(BaseCommand):
                 recipients, 'UPCOMING_REVIEW',
                 f"{appt.patient.full_name} has an appointment with {appt.doctor} on {appt.scheduled_at:%Y-%m-%d %H:%M}.",
                 dedupe_key=f"upcoming_appt_{appt.id}",
+            )
+
+    def _pending_leave_requests(self, recipients):
+        # Every still-pending request gets (re-)notified on each scan since
+        # is_read resets the dedupe window - once someone reviews it, its
+        # status changes to Approved/Rejected and it drops out of this
+        # queryset, so admins only ever see it while action is actually needed.
+        for leave in LeaveRequest.objects.filter(status='Pending').select_related('staff__user'):
+            notify(
+                recipients, 'PENDING_LEAVE',
+                f"{leave.staff.user.get_full_name() or leave.staff.user.username} requested leave, "
+                f"returning {leave.end_date} - awaiting review.",
+                dedupe_key=f"pending_leave_{leave.id}",
             )

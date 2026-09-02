@@ -1,6 +1,6 @@
 import { useState, useEffect, Fragment } from 'react';
-import { Receipt, TrendingUp, AlertCircle, Plus, X, Loader2, CreditCard, Printer, Pencil, Check } from 'lucide-react';
-import { getInvoices, createInvoice, recordPayment, updatePaymentMpesaCode, getInvoicePrintHtml } from '../api/billing';
+import { Receipt, TrendingUp, AlertCircle, Plus, X, Loader2, CreditCard, Printer, Pencil, Check, CalendarClock } from 'lucide-react';
+import { getInvoices, createInvoice, recordPayment, updatePaymentMpesaCode, getInvoicePrintHtml, chargeDailyBedFees } from '../api/billing';
 import { getPatients } from '../api/patients';
 
 const STATUS_STYLES = {
@@ -11,10 +11,16 @@ const STATUS_STYLES = {
 
 const EMPTY_ITEM = { description: '', quantity: 1, unit_price: '' };
 
-export default function Billing() {
+export default function Billing({ user }) {
+  const isAdmin = user?.is_superuser || user?.role?.is_admin_role;
+
   const [invoices, setInvoices] = useState([]);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [dailyChargeBusy, setDailyChargeBusy] = useState(false);
+  const [dailyChargeResult, setDailyChargeResult] = useState(null);
+  const [dailyChargeError, setDailyChargeError] = useState('');
 
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [invoiceForm, setInvoiceForm] = useState({ patient: '', items: [{ ...EMPTY_ITEM }] });
@@ -137,6 +143,26 @@ export default function Billing() {
     }
   };
 
+  // --- Per-diem bed charging ---
+  const handleChargeDailyFees = async () => {
+    setDailyChargeBusy(true);
+    setDailyChargeError('');
+    setDailyChargeResult(null);
+    try {
+      const summary = await chargeDailyBedFees();
+      setDailyChargeResult(summary);
+      if (summary.charged_count > 0) await loadInvoices();
+    } catch (err) {
+      setDailyChargeError(
+        err.response?.status === 403
+          ? 'Only administrators can run daily bed charges.'
+          : 'Could not run daily bed charges. Please try again.'
+      );
+    } finally {
+      setDailyChargeBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16 text-slate">
@@ -168,7 +194,32 @@ export default function Billing() {
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-between items-start gap-3 flex-wrap">
+        {isAdmin ? (
+          <div>
+            <button
+              onClick={handleChargeDailyFees}
+              disabled={dailyChargeBusy}
+              className="flex items-center gap-2 bg-white border border-gray-200 text-harbor text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-mist transition-colors disabled:opacity-60"
+            >
+              {dailyChargeBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarClock className="w-4 h-4" />}
+              Run Daily Bed Charges
+            </button>
+            {dailyChargeResult && (
+              <p className="text-xs text-slate mt-2">
+                Charged <span className="font-medium text-harbor">{dailyChargeResult.charged_count}</span> patient(s),
+                total <span className="font-medium text-harbor">KES {Number(dailyChargeResult.total_amount).toLocaleString()}</span> for {dailyChargeResult.date}.
+                {dailyChargeResult.skipped_already_charged_count > 0 && (
+                  <> {dailyChargeResult.skipped_already_charged_count} already charged today.</>
+                )}
+                {dailyChargeResult.skipped_no_rate_count > 0 && (
+                  <> {dailyChargeResult.skipped_no_rate_count} skipped — no rate set for their ward (Settings).</>
+                )}
+              </p>
+            )}
+            {dailyChargeError && <p className="text-xs text-red-500 mt-2">{dailyChargeError}</p>}
+          </div>
+        ) : <div />}
         <button
           onClick={() => setShowInvoiceForm(true)}
           className="flex items-center gap-2 bg-serenity text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-harbor transition-colors"

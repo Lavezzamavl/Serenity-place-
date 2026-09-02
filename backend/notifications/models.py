@@ -8,6 +8,7 @@ class Notification(models.Model):
         ('MISSED_MEDICATION', 'Missed Medication'),
         ('UPCOMING_REVIEW', 'Upcoming Review'),
         ('OUTSTANDING_BILL', 'Outstanding Bill'),
+        ('PENDING_LEAVE', 'Pending Leave Request'),
     ]
 
     recipient = models.ForeignKey('accounts.User', on_delete=models.CASCADE, related_name='notifications')

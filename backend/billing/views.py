@@ -2,9 +2,11 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.response import Response
 from .models import Invoice, Payment
 from .serializers import InvoiceSerializer, InvoiceCreateSerializer, PaymentSerializer
-from patients.permissions import HasModulePermission
+from .services import charge_daily_bed_fees
+from patients.permissions import HasModulePermission, IsAdminRole
 from facility_settings.models import FacilitySettings
 from audit_trail.mixins import AuditLoggingMixin
 from audit_trail.utils import log_action
@@ -14,12 +16,31 @@ class InvoiceViewSet(AuditLoggingMixin,viewsets.ModelViewSet):
         'items', 'payments'
     ).order_by('-created_at')
     permission_classes = [HasModulePermission]
+    module_key = 'billing'
     audit_module = 'billing'
 
     def get_serializer_class(self):
         if self.action == 'create':
             return InvoiceCreateSerializer
         return InvoiceSerializer
+
+    def get_permissions(self):
+        if self.action == 'charge_daily_fees':
+            return [IsAdminRole()]
+        return super().get_permissions()
+
+    @action(detail=False, methods=['post'], url_path='charge-daily-fees')
+    def charge_daily_fees(self, request):
+        """POST /api/billing/charge-daily-fees/ - admin-only. Charges every
+        currently-Admitted patient a per-diem bed fee for today, based on
+        their ward's rate in Facility Settings. Idempotent per day - safe
+        to run more than once (e.g. manually AND via a scheduled task)
+        without double-billing anyone."""
+        summary = charge_daily_bed_fees(charged_by=request.user)
+        log_action(request, 'daily_bed_fees_charged', module='billing',
+                   detail=f"{summary['charged_count']} patients charged, "
+                          f"total {summary['total_amount']} for {summary['date']}")
+        return Response(summary)
 
     @action(detail=True, methods=['get'])
     def print(self, request, pk=None):
@@ -45,6 +66,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.select_related('invoice', 'received_by')
     serializer_class = PaymentSerializer
     permission_classes = [HasModulePermission]
+    module_key = 'billing'
     audit_module = 'billing'
     
     def perform_create(self, serializer):

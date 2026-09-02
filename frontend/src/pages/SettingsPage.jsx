@@ -180,7 +180,7 @@ export default function SettingsPage({ user, onUserUpdate }) {
             </div>
           </div>
           
-          <div>
+                    <div>
             <label className="block text-xs font-medium text-slate mb-1">Rehab Package Price (KES / week)</label>
             <input 
               type="number" 
@@ -188,6 +188,42 @@ export default function SettingsPage({ user, onUserUpdate }) {
               onChange={(e) => setForm({ ...form, rehab_package_price: e.target.value })}
               className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity" 
             />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate mb-1">Per-Diem Bed Rates (KES / day)</label>
+            <p className="text-xs text-slate/50 mb-2">
+              Used by "Run Daily Bed Charges" on the Billing page. Leave a ward at 0 to skip auto-charging it.
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-xs text-slate/60 mb-1">Ward A</label>
+                <input
+                  type="number"
+                  value={form?.ward_a_daily_rate || ''}
+                  onChange={(e) => setForm({ ...form, ward_a_daily_rate: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate/60 mb-1">Ward B</label>
+                <input
+                  type="number"
+                  value={form?.ward_b_daily_rate || ''}
+                  onChange={(e) => setForm({ ...form, ward_b_daily_rate: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate/60 mb-1">Ward C</label>
+                <input
+                  type="number"
+                  value={form?.ward_c_daily_rate || ''}
+                  onChange={(e) => setForm({ ...form, ward_c_daily_rate: e.target.value })}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                />
+              </div>
+            </div>
           </div>
 
           {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}

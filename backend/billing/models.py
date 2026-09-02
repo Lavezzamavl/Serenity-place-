@@ -88,3 +88,21 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"{self.amount} via {self.method} on {self.invoice.invoice_number}"
+
+
+class DailyBedCharge(models.Model):
+    """One row per patient per calendar day they were charged a per-diem
+    bed fee. The unique_together is what actually prevents double-billing
+    a patient for the same day - not just 'don't click twice' discipline."""
+    patient = models.ForeignKey('patients.Patient', on_delete=models.CASCADE, related_name='daily_bed_charges')
+    date = models.DateField()
+    invoice_item = models.ForeignKey(InvoiceItem, on_delete=models.CASCADE, related_name='daily_bed_charge')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    charged_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('patient', 'date')
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.patient.admission_id} - {self.date} - {self.amount}"

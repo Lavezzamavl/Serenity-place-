@@ -35,3 +35,11 @@ export async function getInvoicePrintHtml(invoiceId) {
   const { data } = await api.get(`/billing/${invoiceId}/print/`, { responseType: 'text' });
   return data;
 }
+
+export async function chargeDailyBedFees() {
+  // Admin-only. Charges every currently-Admitted patient a per-diem bed
+  // fee for today, based on ward rates set in Facility Settings. Safe to
+  // call more than once a day - the backend skips anyone already charged.
+  const { data } = await api.post('/billing/charge-daily-fees/');
+  return data;
+}

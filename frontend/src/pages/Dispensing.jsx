@@ -48,7 +48,6 @@ export default function Dispensing() {
         patient: form.patient,
         drug: form.drug,
         quantity: qty,
-        unit_price: form.unit_price || undefined,
         notes: form.notes,
       });
       setRecords((prev) => [record, ...prev]);
@@ -124,11 +123,11 @@ export default function Dispensing() {
                 />
               </div>
               <div>
-                <label className="text-xs text-slate">Unit price</label>
+                <label className="text-xs text-slate">Unit price (locked)</label>
                 <input
-                  type="number" min="0" step="0.01" value={form.unit_price}
-                  onChange={(e) => setForm({ ...form, unit_price: e.target.value })}
-                  className="w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                  type="text" readOnly value={form.unit_price ? `KES ${form.unit_price}` : '—'}
+                  title="Set by the drug's current selling price - cannot be edited when dispensing."
+                  className="w-full mt-1 px-3 py-2 rounded-lg border border-gray-200 text-sm bg-gray-50 text-slate cursor-not-allowed"
                 />
               </div>
             </div>

@@ -4,7 +4,14 @@ export async function getInventoryItems() {
   const { data } = await api.get('/inventory/');
   return unwrapList(data);
 }
-export async function adjustStock(itemId, change, reason) {
-  const { data } = await api.post('/inventory/adjustments/', { item: itemId, change, reason });
+export async function adjustStock(itemId, change, reason, pricing) {
+  // pricing: optional { buying_price, unit_price } - only meaningful (and
+  // only accepted by the backend) on a restock, i.e. change > 0.
+  const { data } = await api.post('/inventory/adjustments/', {
+    item: itemId,
+    change,
+    reason,
+    ...(pricing || {}),
+  });
   return data;
 }

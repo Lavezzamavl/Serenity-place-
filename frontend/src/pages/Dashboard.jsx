@@ -22,6 +22,7 @@ function buildStats(data) {
     { label: 'Revenue (This Month)', value: `KES ${data.revenue_this_month.toLocaleString()}`, icon: 'TrendingUp', tone: 'sage' },
     { label: 'Outstanding Balances', value: `KES ${data.total_outstanding_balance.toLocaleString()}`, icon: 'AlertCircle', tone: 'red' },
     { label: 'Pharmacy Stock Alerts', value: data.pharmacy_stock_alerts, icon: 'Pill', tone: 'red' },
+    { label: 'Inventory Stock Alerts', value: data.inventory_stock_alerts, icon: 'Package', tone: 'red' },
   ];
 }
 

@@ -11,11 +11,27 @@ export async function createInvoice(patientId, items) {
   return data;
 }
 
-export async function recordPayment(invoiceId, amount, method) {
+export async function recordPayment(invoiceId, amount, method, mpesaCode) {
   const { data } = await api.post('/billing/payments/', {
     invoice: invoiceId,
     amount,
     method,
+    mpesa_code: mpesaCode || '',
   });
+  return data;
+}
+
+export async function updatePaymentMpesaCode(paymentId, mpesaCode) {
+  // Lets a payment's M-Pesa code be corrected after the fact -
+  // it's the one field on a payment that stays editable post-capture.
+  const { data } = await api.patch(`/billing/payments/${paymentId}/`, { mpesa_code: mpesaCode });
+  return data;
+}
+
+export async function getInvoicePrintHtml(invoiceId) {
+  // Returns raw HTML (not JSON) - the caller opens it in a new tab/window.
+  // Fetched through axios (not a plain <a href>) so the JWT Authorization
+  // header the interceptor attaches actually reaches this endpoint.
+  const { data } = await api.get(`/billing/${invoiceId}/print/`, { responseType: 'text' });
   return data;
 }

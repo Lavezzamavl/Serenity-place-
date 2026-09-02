@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Receipt, TrendingUp, AlertCircle, Plus, X, Loader2, CreditCard } from 'lucide-react';
-import { getInvoices, createInvoice, recordPayment } from '../api/billing';
+import { useState, useEffect, Fragment } from 'react';
+import { Receipt, TrendingUp, AlertCircle, Plus, X, Loader2, CreditCard, Printer, Pencil, Check } from 'lucide-react';
+import { getInvoices, createInvoice, recordPayment, updatePaymentMpesaCode, getInvoicePrintHtml } from '../api/billing';
 import { getPatients } from '../api/patients';
 
 const STATUS_STYLES = {
@@ -22,9 +22,14 @@ export default function Billing() {
   const [submittingInvoice, setSubmittingInvoice] = useState(false);
 
   const [paymentTarget, setPaymentTarget] = useState(null); // invoice being paid
-  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'Cash' });
+  const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'Cash', mpesa_code: '' });
   const [paymentError, setPaymentError] = useState('');
   const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  const [expandedInvoice, setExpandedInvoice] = useState(null);
+  const [editingMpesaId, setEditingMpesaId] = useState(null);
+  const [mpesaEditValue, setMpesaEditValue] = useState('');
+  const [printingId, setPrintingId] = useState(null);
 
   const loadInvoices = () => getInvoices().then(setInvoices);
 
@@ -74,7 +79,7 @@ export default function Billing() {
   // --- Payment recording ---
   const openPayment = (invoice) => {
     setPaymentTarget(invoice);
-    setPaymentForm({ amount: '', method: 'Cash' });
+    setPaymentForm({ amount: '', method: 'Cash', mpesa_code: '' });
     setPaymentError('');
   };
 
@@ -87,7 +92,7 @@ export default function Billing() {
 
     setSubmittingPayment(true);
     try {
-      await recordPayment(paymentTarget.id, amount, paymentForm.method);
+      await recordPayment(paymentTarget.id, amount, paymentForm.method, paymentForm.mpesa_code);
       await loadInvoices();
       setPaymentTarget(null);
     } catch (err) {
@@ -95,6 +100,40 @@ export default function Billing() {
       setPaymentError(serverMsg || 'Could not record payment. Please try again.');
     } finally {
       setSubmittingPayment(false);
+    }
+  };
+
+  // --- M-Pesa code correction after the fact ---
+  const startEditMpesa = (payment) => {
+    setEditingMpesaId(payment.id);
+    setMpesaEditValue(payment.mpesa_code || '');
+  };
+
+  const saveMpesaEdit = async (paymentId) => {
+    try {
+      await updatePaymentMpesaCode(paymentId, mpesaEditValue);
+      await loadInvoices();
+      setEditingMpesaId(null);
+    } catch {
+      // leave the field open so the user can retry
+    }
+  };
+
+  // --- Printable invoice ---
+  const handlePrint = async (invoiceId) => {
+    setPrintingId(invoiceId);
+    try {
+      const html = await getInvoicePrintHtml(invoiceId);
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+      }
+    } catch {
+      alert('Could not open the printable invoice. Please try again.');
+    } finally {
+      setPrintingId(null);
     }
   };
 
@@ -142,7 +181,7 @@ export default function Billing() {
         <div className="px-5 py-3 border-b border-gray-100">
           <h4 className="font-medium text-harbor">Invoices</h4>
         </div>
-        <table className="w-full text-sm min-w-[760px]">
+        <table className="w-full text-sm min-w-[820px]">
           <thead className="bg-mist text-slate text-xs uppercase tracking-wide">
             <tr>
               <th className="text-left px-5 py-3 font-medium">Invoice</th>
@@ -156,28 +195,108 @@ export default function Billing() {
           </thead>
           <tbody className="divide-y divide-gray-100">
             {invoices.map((inv) => (
-              <tr key={inv.id} className="hover:bg-mist/50 transition-colors">
-                <td className="px-5 py-3 font-mono text-xs text-harbor">{inv.invoice_number}</td>
-                <td className="px-5 py-3 font-medium text-harbor">{inv.patient_name}</td>
-                <td className="px-5 py-3 font-mono text-harbor">KES {Number(inv.total_amount).toLocaleString()}</td>
-                <td className="px-5 py-3 font-mono text-slate">KES {Number(inv.total_paid).toLocaleString()}</td>
-                <td className="px-5 py-3 font-mono text-slate">KES {Number(inv.balance).toLocaleString()}</td>
-                <td className="px-5 py-3">
-                  <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[inv.status]}`}>
-                    {inv.status}
-                  </span>
-                </td>
-                <td className="px-5 py-3">
-                  {inv.status !== 'Paid' && (
+              <Fragment key={inv.id}>
+                <tr className="hover:bg-mist/50 transition-colors">
+                  <td className="px-5 py-3 font-mono text-xs text-harbor">
                     <button
-                      onClick={() => openPayment(inv)}
-                      className="flex items-center gap-1 text-serenity text-xs font-medium hover:text-harbor"
+                      onClick={() => setExpandedInvoice(expandedInvoice === inv.id ? null : inv.id)}
+                      className="hover:underline"
                     >
-                      <CreditCard className="w-3.5 h-3.5" /> Record Payment
+                      {inv.invoice_number}
                     </button>
-                  )}
-                </td>
-              </tr>
+                  </td>
+                  <td className="px-5 py-3 font-medium text-harbor">{inv.patient_name}</td>
+                  <td className="px-5 py-3 font-mono text-harbor">KES {Number(inv.total_amount).toLocaleString()}</td>
+                  <td className="px-5 py-3 font-mono text-slate">KES {Number(inv.total_paid).toLocaleString()}</td>
+                  <td className="px-5 py-3 font-mono text-slate">KES {Number(inv.balance).toLocaleString()}</td>
+                  <td className="px-5 py-3">
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[inv.status]}`}>
+                      {inv.status}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-3">
+                      {inv.status !== 'Paid' && (
+                        <button
+                          onClick={() => openPayment(inv)}
+                          className="flex items-center gap-1 text-serenity text-xs font-medium hover:text-harbor"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" /> Record Payment
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handlePrint(inv.id)}
+                        disabled={printingId === inv.id}
+                        className="flex items-center gap-1 text-slate text-xs font-medium hover:text-harbor disabled:opacity-50"
+                      >
+                        {printingId === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+                        Print
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {expandedInvoice === inv.id && (
+                  <tr key={`${inv.id}-detail`} className="bg-mist/40">
+                    <td colSpan={7} className="px-5 py-4">
+                      <p className="text-xs font-medium text-slate uppercase tracking-wide mb-2">Charges</p>
+                      <table className="w-full text-xs mb-3">
+                        <tbody>
+                          {inv.items.map((item) => (
+                            <tr key={item.id} className="border-b border-gray-100 last:border-0">
+                              <td className="py-1.5 text-harbor">{item.description}</td>
+                              <td className="py-1.5 text-slate text-right w-16">x{item.quantity}</td>
+                              <td className="py-1.5 text-slate text-right w-28 font-mono">KES {Number(item.line_total).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      <p className="text-xs font-medium text-slate uppercase tracking-wide mb-2">Payments</p>
+                      {inv.payments.length === 0 ? (
+                        <p className="text-xs text-slate/50">No payments recorded yet.</p>
+                      ) : (
+                        <table className="w-full text-xs">
+                          <tbody>
+                            {inv.payments.map((p) => (
+                              <tr key={p.id} className="border-b border-gray-100 last:border-0">
+                                <td className="py-1.5 text-slate w-32">{new Date(p.received_at).toLocaleDateString()}</td>
+                                <td className="py-1.5 text-harbor w-28">{p.method}</td>
+                                <td className="py-1.5 text-slate">
+                                  {p.method === 'M-Pesa' ? (
+                                    editingMpesaId === p.id ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <input
+                                          value={mpesaEditValue}
+                                          onChange={(e) => setMpesaEditValue(e.target.value)}
+                                          placeholder="M-Pesa code"
+                                          className="px-2 py-1 rounded border border-gray-200 text-xs w-32"
+                                          autoFocus
+                                        />
+                                        <button onClick={() => saveMpesaEdit(p.id)} className="text-sage hover:text-harbor">
+                                          <Check className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button
+                                        onClick={() => startEditMpesa(p)}
+                                        className="flex items-center gap-1 font-mono hover:text-harbor"
+                                        title="Click to correct the M-Pesa code"
+                                      >
+                                        {p.mpesa_code || '— add code'} <Pencil className="w-3 h-3 opacity-50" />
+                                      </button>
+                                    )
+                                  ) : '—'}
+                                </td>
+                                <td className="py-1.5 text-harbor text-right w-24 font-mono">KES {Number(p.amount).toLocaleString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
             {invoices.length === 0 && (
               <tr><td colSpan={7} className="text-center py-10 text-slate/60">No invoices yet.</td></tr>
@@ -285,7 +404,7 @@ export default function Billing() {
                 <label className="block text-xs font-medium text-slate mb-1">Payment Method</label>
                 <select
                   value={paymentForm.method}
-                  onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value })}
+                  onChange={(e) => setPaymentForm({ ...paymentForm, method: e.target.value, mpesa_code: e.target.value === 'M-Pesa' ? paymentForm.mpesa_code : '' })}
                   className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity bg-white"
                 >
                   <option>Cash</option>
@@ -294,6 +413,18 @@ export default function Billing() {
                   <option>Card</option>
                 </select>
               </div>
+
+              {paymentForm.method === 'M-Pesa' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate mb-1">M-Pesa Code (optional now, can add later)</label>
+                  <input
+                    value={paymentForm.mpesa_code}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, mpesa_code: e.target.value })}
+                    placeholder="e.g. QAB1CD2EFG"
+                    className="w-full px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-serenity"
+                  />
+                </div>
+              )}
 
               {paymentError && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{paymentError}</p>}
 
